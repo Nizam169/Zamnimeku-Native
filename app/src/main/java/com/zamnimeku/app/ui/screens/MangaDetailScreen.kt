@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.zamnimeku.app.data.api.MangaApi
+import com.zamnimeku.app.data.model.MangaChapter
 import com.zamnimeku.app.data.model.MangaDetail
-import com.zamnimeku.app.data.model.MangaEpisode
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.theme.*
