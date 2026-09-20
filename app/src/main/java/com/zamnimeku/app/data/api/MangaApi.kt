@@ -24,16 +24,20 @@ object MangaApi {
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
                 .header("User-Agent", USER_AGENT)
+                .header("Referer", "https://www.mynimeku.com/")
                 .build()
             chain.proceed(req)
         }
         .build()
 
     private fun getHtml(url: String): String {
-        val request = Request.Builder().url(url).build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return ""
-            return response.body?.string() ?: ""
+        return try {
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) "" else response.body?.string() ?: ""
+            }
+        } catch (_: Exception) {
+            ""
         }
     }
 
@@ -171,26 +175,45 @@ object MangaApi {
     }
 
     suspend fun getChapterImages(chapterSlug: String): List<String> = withContext(Dispatchers.IO) {
-        val url = "$BASE_URL/wp-json/wp/v2/chapter?slug=$chapterSlug&_embed=1"
-        val jsonStr = getHtml(url)
-        if (jsonStr.isEmpty()) return@withContext emptyList()
-
         val images = mutableListOf<String>()
+
+        // 1. Ambil dari WP REST API
         try {
-            val arr = JSONArray(jsonStr)
-            if (arr.length() > 0) {
-                val obj = arr.getJSONObject(0)
-                val rendered = obj.optJSONObject("content")?.optString("rendered") ?: ""
-                val doc = Jsoup.parse(rendered)
-                val imgElements = doc.select("img")
-                for (img in imgElements) {
-                    val src = img.attr("src")
-                    if (src.startsWith("http") && !images.contains(src)) {
-                        images.add(src)
+            val url = "$BASE_URL/wp-json/wp/v2/chapter?slug=$chapterSlug&_embed=1"
+            val jsonStr = getHtml(url)
+            if (jsonStr.isNotEmpty()) {
+                val arr = JSONArray(jsonStr)
+                if (arr.length() > 0) {
+                    val obj = arr.getJSONObject(0)
+                    val rendered = obj.optJSONObject("content")?.optString("rendered") ?: ""
+                    val doc = Jsoup.parse(rendered)
+                    val imgElements = doc.select("img")
+                    for (img in imgElements) {
+                        val src = img.attr("src")
+                        if (src.startsWith("http") && !images.contains(src)) {
+                            images.add(src)
+                        }
                     }
                 }
             }
         } catch (_: Exception) {}
+
+        // 2. Fallback: Parse halaman HTML chapter langsung
+        if (images.isEmpty()) {
+            try {
+                val html = getHtml("$BASE_URL/chapter/$chapterSlug/")
+                if (html.isNotEmpty()) {
+                    val doc = Jsoup.parse(html)
+                    val imgElements = doc.select("div.main-reading-area img, div.reader-area img, img")
+                    for (img in imgElements) {
+                        val src = img.attr("src").ifEmpty { img.attr("data-src") }
+                        if (src.startsWith("http") && !images.contains(src) && !src.contains("icon-mynimeku") && !src.contains("logo")) {
+                            images.add(src)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
         images
     }
 }

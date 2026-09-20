@@ -1,7 +1,9 @@
 package com.zamnimeku.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,8 +12,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,11 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.zamnimeku.app.data.api.MangaApi
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
@@ -36,10 +38,19 @@ fun MangaReaderScreen(
     chapterTitle: String,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     var images by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showControls by remember { mutableStateOf(true) }
+
+    fun loadImages() {
+        isLoading = true
+        errorMessage = null
+        kotlinx.coroutines.GlobalScope.let {
+            // will be launched in LaunchedEffect
+        }
+    }
 
     LaunchedEffect(chapterSlug) {
         isLoading = true
@@ -55,8 +66,11 @@ fun MangaReaderScreen(
         }
     }
 
+    val listState = rememberLazyListState()
+    val firstVisibleItemIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
+
     Scaffold(
-        containerColor = Color.Black
+        containerColor = Color(0xFF1E293B)
     ) { padding ->
         Box(
             modifier = Modifier
@@ -69,33 +83,82 @@ fun MangaReaderScreen(
             if (isLoading) {
                 LoadingView(text = "Memuat halaman komik...")
             } else if (errorMessage != null) {
-                ErrorView(message = errorMessage ?: "Terjadi kesalahan", onRetry = { /* reload */ })
+                ErrorView(
+                    message = errorMessage ?: "Terjadi kesalahan",
+                    onRetry = {
+                        isLoading = true
+                        errorMessage = null
+                    }
+                )
             } else {
-                val listState = rememberLazyListState()
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
                     itemsIndexed(images) { index, imgUrl ->
-                        AsyncImage(
-                            model = imgUrl,
-                            contentDescription = "Halaman ${index + 1}",
-                            contentScale = ContentScale.FillWidth,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .wrapContentHeight()
-                        )
+                                .defaultMinSize(minHeight = 250.dp)
+                                .background(Color(0xFF0F172A)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            SubcomposeAsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(imgUrl)
+                                    .crossfade(true)
+                                    .addHeader("Referer", "https://www.mynimeku.com/")
+                                    .build(),
+                                contentDescription = "Halaman ${index + 1}",
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .wrapContentHeight(),
+                                loading = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(300.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "Halaman ${index + 1}",
+                                                color = Color.White.copy(alpha = 0.6f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                },
+                                error = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(180.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Gagal memuat halaman ${index + 1}", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
 
             // Top Bar Overlay
-            if (showControls) {
+            AnimatedVisibility(
+                visible = showControls,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter)
+            ) {
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter),
-                    color = Color.Black.copy(alpha = 0.75f)
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.Black.copy(alpha = 0.8f)
                 ) {
                     Row(
                         modifier = Modifier
@@ -112,10 +175,31 @@ fun MangaReaderScreen(
                             text = chapterTitle,
                             color = Color.White,
                             style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
+            }
+
+            // Bottom Page Indicator Pill
+            if (images.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .padding(bottom = 16.dp)
+                        .align(Alignment.BottomCenter),
+                    color = Color.Black.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, WibukuPrimary.copy(alpha = 0.6f))
+                ) {
+                    Text(
+                        text = "${firstVisibleItemIndex + 1} / ${images.size}",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
                 }
             }
         }
