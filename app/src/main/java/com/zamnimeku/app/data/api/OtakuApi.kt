@@ -2,11 +2,7 @@ package com.zamnimeku.app.data.api
 
 import android.util.Base64
 import com.zamnimeku.app.data.model.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -20,8 +16,8 @@ object OtakuApi {
     private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .addInterceptor { chain ->
             val original = chain.request()
             val request = original.newBuilder()
@@ -33,10 +29,13 @@ object OtakuApi {
         .build()
 
     private fun getHtml(url: String): String {
-        val request = Request.Builder().url(url).build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return ""
-            return response.body?.string() ?: ""
+        return try {
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) "" else response.body?.string() ?: ""
+            }
+        } catch (_: Exception) {
+            ""
         }
     }
 
@@ -428,7 +427,7 @@ object OtakuApi {
             if (epHtml.isNotEmpty()) {
                 val doc = Jsoup.parse(epHtml)
 
-                // 1. Default Iframe
+                // 1. Ambil Default Direct Stream (Sangat Cepat < 0.5 detik)
                 val defaultIframe = doc.selectFirst("iframe")?.attr("src") ?: ""
                 if (defaultIframe.isNotEmpty()) {
                     val directV = extractVideoFromEmbed(defaultIframe)
@@ -440,7 +439,7 @@ object OtakuApi {
                     }
                 }
 
-                // 2. Parse mirrors
+                // 2. Parse mirror links
                 val mirrorElements = doc.select("ul[class^=m] li a")
                 val mirrors = mutableListOf<Triple<String, String, String>>()
                 for (a in mirrorElements) {
@@ -453,7 +452,7 @@ object OtakuApi {
                     }
                 }
 
-                // 3. Resolve mirrors via Ajax
+                // 3. Resolve mirrors via Ajax dengan batas waktu maksimal 4 detik
                 val ajaxUrl = "$BASE_URL/wp-admin/admin-ajax.php"
                 val nonceReq = Request.Builder()
                     .url(ajaxUrl)
@@ -461,53 +460,57 @@ object OtakuApi {
                     .header("X-Requested-With", "XMLHttpRequest")
                     .build()
 
-                val nonceJson = client.newCall(nonceReq).execute().use { it.body?.string() ?: "" }
-                val nonce = try { JSONObject(nonceJson).optString("data") } catch (_: Exception) { "" }
+                try {
+                    val nonceJson = client.newCall(nonceReq).execute().use { it.body?.string() ?: "" }
+                    val nonce = try { JSONObject(nonceJson).optString("data") } catch (_: Exception) { "" }
 
-                if (nonce.isNotEmpty()) {
-                    coroutineScope {
-                        mirrors.map { (quality, _, dataContent) ->
-                            async(Dispatchers.IO) {
-                                try {
-                                    var norm = dataContent.trim()
-                                    while (norm.length % 4 != 0) norm += "="
-                                    val decoded = String(Base64.decode(norm, Base64.DEFAULT))
-                                    val meta = JSONObject(decoded)
+                    if (nonce.isNotEmpty()) {
+                        withTimeoutOrNull(4000) {
+                            coroutineScope {
+                                mirrors.map { (quality, _, dataContent) ->
+                                    async(Dispatchers.IO) {
+                                        try {
+                                            var norm = dataContent.trim()
+                                            while (norm.length % 4 != 0) norm += "="
+                                            val decoded = String(Base64.decode(norm, Base64.DEFAULT))
+                                            val meta = JSONObject(decoded)
 
-                                    val postReq = Request.Builder()
-                                        .url(ajaxUrl)
-                                        .post(
-                                            FormBody.Builder()
-                                                .add("id", meta.optString("id"))
-                                                .add("i", meta.optString("i"))
-                                                .add("q", meta.optString("q"))
-                                                .add("nonce", nonce)
-                                                .add("action", "2a3505c93b0035d3f455df82bf976b84")
+                                            val postReq = Request.Builder()
+                                                .url(ajaxUrl)
+                                                .post(
+                                                    FormBody.Builder()
+                                                        .add("id", meta.optString("id"))
+                                                        .add("i", meta.optString("i"))
+                                                        .add("q", meta.optString("q"))
+                                                        .add("nonce", nonce)
+                                                        .add("action", "2a3505c93b0035d3f455df82bf976b84")
+                                                        .build()
+                                                )
+                                                .header("X-Requested-With", "XMLHttpRequest")
                                                 .build()
-                                        )
-                                        .header("X-Requested-With", "XMLHttpRequest")
-                                        .build()
 
-                                    val rJson = client.newCall(postReq).execute().use { it.body?.string() ?: "" }
-                                    val b64Data = JSONObject(rJson).optString("data")
-                                    if (b64Data.isNotEmpty()) {
-                                        var b64Norm = b64Data.trim()
-                                        while (b64Norm.length % 4 != 0) b64Norm += "="
-                                        val iframeHtml = String(Base64.decode(b64Norm, Base64.DEFAULT))
-                                        val iframeSrc = Pattern.compile("""src=["']([^"']+)["']""").matcher(iframeHtml)
-                                        if (iframeSrc.find()) {
-                                            val embedUrl = iframeSrc.group(1)!!
-                                            val v = extractVideoFromEmbed(embedUrl)
-                                            if (!v.isNullOrEmpty()) {
-                                                addUrl(quality, v)
+                                            val rJson = client.newCall(postReq).execute().use { it.body?.string() ?: "" }
+                                            val b64Data = JSONObject(rJson).optString("data")
+                                            if (b64Data.isNotEmpty()) {
+                                                var b64Norm = b64Data.trim()
+                                                while (b64Norm.length % 4 != 0) b64Norm += "="
+                                                val iframeHtml = String(Base64.decode(b64Norm, Base64.DEFAULT))
+                                                val iframeSrc = Pattern.compile("""src=["']([^"']+)["']""").matcher(iframeHtml)
+                                                if (iframeSrc.find()) {
+                                                    val embedUrl = iframeSrc.group(1)!!
+                                                    val v = extractVideoFromEmbed(embedUrl)
+                                                    if (!v.isNullOrEmpty()) {
+                                                        addUrl(quality, v)
+                                                    }
+                                                }
                                             }
-                                        }
+                                        } catch (_: Exception) {}
                                     }
-                                } catch (_: Exception) {}
+                                }.awaitAll()
                             }
-                        }.awaitAll()
+                        }
                     }
-                }
+                } catch (_: Exception) {}
             }
         } catch (_: Exception) {}
 
@@ -523,7 +526,7 @@ object OtakuApi {
         allAvailable.sortByDescending { scoreStreamUrl(it) }
 
         val result = mutableListOf<VideoSource>()
-        // 4 Resolusi lengkap: 360p, 480p, 720p, dan 1080p!
+        // 4 Resolusi lengkap: 360p, 480p, 720p, dan 1080p
         val standardQualities = listOf("360p", "480p", "720p", "1080p")
 
         for (q in standardQualities) {

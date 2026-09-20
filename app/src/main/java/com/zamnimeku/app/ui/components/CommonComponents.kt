@@ -1,20 +1,20 @@
 package com.zamnimeku.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -29,13 +29,13 @@ import com.zamnimeku.app.data.model.AnimeCard
 import com.zamnimeku.app.data.model.MangaCard
 import com.zamnimeku.app.ui.theme.*
 
+// 5 Menu Tetap Wibuku (Random dihapus sesuai permintaan)
 enum class NavTab(val title: String, val icon: ImageVector) {
-    HOME("Home", Icons.Rounded.Home),
+    HOME("Home", Icons.Rounded.GridView),
     GENRE("Genre", Icons.Rounded.Category),
-    RANDOM("Random", Icons.Rounded.Shuffle),
     SCHEDULE("Jadwal", Icons.Rounded.CalendarMonth),
-    MANGA("Komik", Icons.Rounded.AutoStories),
-    HISTORY("Riwayat", Icons.Rounded.History)
+    MANGA("Komik", Icons.Rounded.MenuBook),
+    HISTORY("History", Icons.Rounded.History)
 }
 
 @Composable
@@ -44,50 +44,73 @@ fun AppBottomBar(
     onTabSelected: (NavTab) -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = WibukuSurface,
-        shadowElevation = 8.dp
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(12.dp, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)),
+        color = Color.White,
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 14.dp, vertical = 8.dp)
         ) {
-            NavTab.values().forEach { tab ->
-                val isSelected = tab == currentTab
-                Column(
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFE3F2FD),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onTabSelected(tab) }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(if (isSelected) WibukuBadge else Color.Transparent),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.title,
-                            tint = if (isSelected) WibukuPrimary else WibukuNavInactive,
-                            modifier = Modifier.size(22.dp)
+                    NavTab.values().forEach { tab ->
+                        val isSelected = tab == currentTab
+                        val bgColor by animateColorAsState(
+                            targetValue = if (isSelected) WibukuPrimary else Color.Transparent,
+                            animationSpec = tween(durationMillis = 200),
+                            label = "navBg"
                         )
+                        val contentColor by animateColorAsState(
+                            targetValue = if (isSelected) Color.White else WibukuMuted,
+                            animationSpec = tween(durationMillis = 200),
+                            label = "navColor"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(bgColor)
+                                .clickable { onTabSelected(tab) }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.title,
+                                    tint = contentColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = tab.title,
+                                    color = contentColor,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = tab.title,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isSelected) WibukuPrimary else WibukuNavInactive,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 10.sp
-                    )
                 }
             }
         }
@@ -102,9 +125,10 @@ fun AnimeCardView(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = WibukuSurface),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
@@ -120,25 +144,25 @@ fun AnimeCardView(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Gradient bottom
+                // Subtle shadow gradient
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                                startY = 150f
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f)),
+                                startY = 120f
                             )
                         )
                 )
 
-                // Episode badge
+                // Episode badge (Top Start)
                 if (anime.episode.isNotEmpty()) {
                     Surface(
                         modifier = Modifier
                             .padding(6.dp)
                             .align(Alignment.TopStart),
-                        color = WibukuPrimary.copy(alpha = 0.9f),
+                        color = WibukuPrimary.copy(alpha = 0.92f),
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
@@ -151,7 +175,7 @@ fun AnimeCardView(
                     }
                 }
 
-                // Day / Score badge
+                // Score / Day badge (Bottom End)
                 val tag = if (anime.score.isNotEmpty()) "★ ${anime.score}" else anime.day
                 if (tag.isNotEmpty()) {
                     Surface(
@@ -163,7 +187,7 @@ fun AnimeCardView(
                     ) {
                         Text(
                             text = tag,
-                            color = Color.White,
+                            color = if (anime.score.isNotEmpty()) Color(0xFFFBBF24) else Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -179,7 +203,9 @@ fun AnimeCardView(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(8.dp),
                 fontSize = 12.sp,
-                lineHeight = 16.sp
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = WibukuText
             )
         }
     }
@@ -193,9 +219,10 @@ fun MangaCardView(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = WibukuSurface),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
@@ -218,7 +245,9 @@ fun MangaCardView(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(8.dp),
                 fontSize = 12.sp,
-                lineHeight = 16.sp
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = WibukuText
             )
         }
     }
@@ -231,9 +260,9 @@ fun LoadingView(modifier: Modifier = Modifier, text: String = "Memuat data...") 
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 3.dp)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(text = text, style = MaterialTheme.typography.bodyMedium)
+            CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(text = text, style = MaterialTheme.typography.bodyMedium, color = WibukuMuted, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -261,12 +290,14 @@ fun ErrorView(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                color = WibukuText
             )
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary)
+                colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(imageVector = Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -282,7 +313,6 @@ fun QualitySelectionDialog(
     onQualitySelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    // 4 Resolusi Lengkap sampai 1080p
     val qualities = listOf(
         Pair("360p", "Hemat Kuota • Paling Cepat"),
         Pair("480p", "Kualitas Standar (SD) • Lancar"),
@@ -293,6 +323,7 @@ fun QualitySelectionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = WibukuDark,
+        shape = RoundedCornerShape(16.dp),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.HighQuality, contentDescription = null, tint = WibukuPrimary)
@@ -313,7 +344,9 @@ fun QualitySelectionDialog(
                                 onQualitySelected(q)
                                 onDismiss()
                             },
-                        color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f)
+                        color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) WibukuPrimary else Color.Transparent)
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),

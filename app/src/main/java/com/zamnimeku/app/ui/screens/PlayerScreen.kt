@@ -35,6 +35,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
@@ -83,19 +84,29 @@ fun PlayerScreen(
     var playbackSpeed by remember { mutableStateOf(1.0f) }
     val speedList = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
 
-    // ExoPlayer instance
+    // ExoPlayer dengan LoadControl Cepat (Instant Playback 250ms)
     val exoPlayer = remember {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
+            .setConnectTimeoutMs(8000)
+            .setReadTimeoutMs(8000)
             .setAllowCrossProtocolRedirects(true)
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
 
+        val fastLoadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 8000,
+                /* maxBufferMs = */ 25000,
+                /* bufferForPlaybackMs = */ 250,
+                /* bufferForPlaybackAfterRebufferMs = */ 500
+            )
+            .build()
+
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(fastLoadControl)
             .setSeekBackIncrementMs(10000)
             .setSeekForwardIncrementMs(10000)
             .build()
@@ -560,7 +571,7 @@ fun PlayerScreen(
             if (!isLandscape) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = WibukuSurface,
+                    color = Color.White,
                     shadowElevation = 1.dp
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -599,7 +610,7 @@ fun PlayerScreen(
                                 },
                             shape = RoundedCornerShape(10.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isCurrent) WibukuBadge else WibukuSurface
+                                containerColor = if (isCurrent) WibukuBadge else Color.White
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
