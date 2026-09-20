@@ -134,7 +134,7 @@ fun RandomScreen(
                                     .fillMaxSize()
                                     .background(
                                         Brush.verticalGradient(
-                                            colors = listOf(Color.Transparent, Color.Black.withOpacity(0.75f)),
+                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
                                             startY = 200f
                                         )
                                     )
@@ -167,7 +167,7 @@ fun RandomScreen(
                         style = MaterialTheme.typography.titleMedium,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
-                        overflow = TextOverflow.ellipsis,
+                        overflow = TextOverflow.Ellipsis,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )

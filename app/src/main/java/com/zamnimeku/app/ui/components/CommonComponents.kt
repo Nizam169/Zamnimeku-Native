@@ -126,7 +126,7 @@ fun AnimeCardView(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.withOpacity(0.7f)),
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
                                 startY = 150f
                             )
                         )
@@ -138,12 +138,12 @@ fun AnimeCardView(
                         modifier = Modifier
                             .padding(6.dp)
                             .align(Alignment.TopStart),
-                        color = WibukuPrimary.withOpacity(0.9f),
+                        color = WibukuPrimary.copy(alpha = 0.9f),
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
                             text = anime.episode,
-                            color = Color.white,
+                            color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -158,12 +158,12 @@ fun AnimeCardView(
                         modifier = Modifier
                             .padding(6.dp)
                             .align(Alignment.BottomEnd),
-                        color = Color.Black.withOpacity(0.75f),
+                        color = Color.Black.copy(alpha = 0.75f),
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
                             text = tag,
-                            color = Color.white,
+                            color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -176,7 +176,7 @@ fun AnimeCardView(
                 text = anime.title,
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
-                overflow = TextOverflow.ellipsis,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(8.dp),
                 fontSize = 12.sp,
                 lineHeight = 16.sp
@@ -215,7 +215,7 @@ fun MangaCardView(
                 text = manga.title,
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
-                overflow = TextOverflow.ellipsis,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(8.dp),
                 fontSize = 12.sp,
                 lineHeight = 16.sp
@@ -313,14 +313,14 @@ fun QualitySelectionDialog(
                                 onQualitySelected(q)
                                 onDismiss()
                             },
-                        color = if (isSelected) WibukuPrimary.withOpacity(0.2f) else Color.White.withOpacity(0.08)
+                        color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08)
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
-                                color = if (isSelected) WibukuPrimary else Color.White.withOpacity(0.2f),
+                                color = if (isSelected) WibukuPrimary else Color.White.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
@@ -334,7 +334,7 @@ fun QualitySelectionDialog(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(text = q, color = if (isSelected) WibukuPrimary else Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(text = desc, color = Color.White.withOpacity(0.6f), fontSize = 10.sp)
+                                Text(text = desc, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
                             }
                             if (isSelected) {
                                 Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = WibukuPrimary, modifier = Modifier.size(20.dp))

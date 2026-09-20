@@ -188,7 +188,7 @@ fun HomeScreen(
             if (isLoading) {
                 LoadingView()
             } else if (errorMessage != null && list.isEmpty()) {
-                ErrorView(message = errorMessage!!, onRetry = { loadData(initial = true) })
+                ErrorView(message = errorMessage ?: "Terjadi kesalahan"!, onRetry = { loadData(initial = true) })
             } else {
                 val gridState = rememberLazyGridState()
 

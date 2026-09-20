@@ -89,7 +89,7 @@ fun MangaListScreen(
             if (isLoading) {
                 LoadingView(text = "Memuat daftar komik...")
             } else if (errorMessage != null && mangaList.isEmpty()) {
-                ErrorView(message = errorMessage!, onRetry = { loadManga(initial = true) })
+                ErrorView(message = errorMessage ?: "Terjadi kesalahan", onRetry = { loadManga(initial = true) })
             } else {
                 val gridState = rememberLazyGridState()
 

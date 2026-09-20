@@ -147,7 +147,7 @@ fun GenreScreen(
                 LoadingView()
             } else if (errorMessage != null && animeList.isEmpty()) {
                 ErrorView(
-                    message = errorMessage!,
+                    message = errorMessage ?: "Terjadi kesalahan",
                     onRetry = { selectedGenre?.let { loadAnimeForGenre(it, initial = true) } }
                 )
             } else {

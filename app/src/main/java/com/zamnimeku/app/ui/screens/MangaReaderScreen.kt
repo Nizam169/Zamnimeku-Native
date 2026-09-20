@@ -69,7 +69,7 @@ fun MangaReaderScreen(
             if (isLoading) {
                 LoadingView(text = "Memuat halaman komik...")
             } else if (errorMessage != null) {
-                ErrorView(message = errorMessage!, onRetry = { /* reload */ })
+                ErrorView(message = errorMessage ?: "Terjadi kesalahan", onRetry = { /* reload */ })
             } else {
                 val listState = rememberLazyListState()
                 LazyColumn(
@@ -95,7 +95,7 @@ fun MangaReaderScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter),
-                    color = Color.Black.withOpacity(0.75f)
+                    color = Color.Black.copy(alpha = 0.75f)
                 ) {
                     Row(
                         modifier = Modifier
@@ -113,7 +113,7 @@ fun MangaReaderScreen(
                             color = Color.White,
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
-                            overflow = TextOverflow.ellipsis
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

@@ -115,7 +115,7 @@ fun ScheduleScreen(
             if (isLoading) {
                 LoadingView(text = "Memuat jadwal tayang...")
             } else if (errorMessage != null) {
-                ErrorView(message = errorMessage!, onRetry = { /* reload */ })
+                ErrorView(message = errorMessage ?: "Terjadi kesalahan", onRetry = { })
             } else if (scheduleList.isNotEmpty() && selectedDayIndex in scheduleList.indices) {
                 val currentDay = scheduleList[selectedDayIndex]
                 LazyColumn(
@@ -162,7 +162,7 @@ fun ScheduleScreen(
                                     style = MaterialTheme.typography.titleSmall,
                                     modifier = Modifier.weight(1f),
                                     maxLines = 2,
-                                    overflow = TextOverflow.ellipsis
+                                    overflow = TextOverflow.Ellipsis
                                 )
 
                                 Icon(

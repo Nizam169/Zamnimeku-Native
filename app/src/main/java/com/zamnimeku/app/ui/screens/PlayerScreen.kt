@@ -313,12 +313,12 @@ fun PlayerScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.withOpacity(0.85f))
+                            .background(Color.Black.copy(alpha = 0.85f))
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(errorMessage!, color = Color.White70, fontSize = 12.sp)
+                            Text(errorMessage!, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
@@ -347,7 +347,7 @@ fun PlayerScreen(
                                 .align(Alignment.TopStart)
                                 .clip(RoundedCornerShape(20.dp))
                                 .clickable { isLocked = false },
-                            color = Color.Black.withOpacity(0.75f),
+                            color = Color.Black.copy(alpha = 0.75f),
                             shape = RoundedCornerShape(20.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, WibukuPrimary)
                         ) {
@@ -368,7 +368,7 @@ fun PlayerScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.withOpacity(0.42f))
+                            .background(Color.Black.copy(alpha = 0.42f))
                     ) {
                         // Top Bar: Back, Title, Lock, Resolution Button [⚙️ 360p/720p/1080p], Speed
                         Row(
@@ -387,7 +387,7 @@ fun PlayerScreen(
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleSmall,
                                 maxLines = 1,
-                                overflow = TextOverflow.ellipsis,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
 
@@ -400,9 +400,9 @@ fun PlayerScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable { showQualityDialog = true },
-                                color = Color.Black.withOpacity(0.55f),
+                                color = Color.Black.copy(alpha = 0.55f),
                                 shape = RoundedCornerShape(8.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, WibukuPrimary.withOpacity(0.85f))
+                                border = androidx.compose.foundation.BorderStroke(1.dp, WibukuPrimary.copy(alpha = 0.85f))
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -431,9 +431,9 @@ fun PlayerScreen(
                                         playbackSpeed = next
                                         exoPlayer.setPlaybackSpeed(next)
                                     },
-                                color = Color.Black.withOpacity(0.55f),
+                                color = Color.Black.copy(alpha = 0.55f),
                                 shape = RoundedCornerShape(8.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.withOpacity(0.24f))
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.24f))
                             ) {
                                 Text(
                                     text = "${playbackSpeed}x",
@@ -460,7 +460,7 @@ fun PlayerScreen(
                                 Icon(
                                     Icons.Rounded.SkipPrevious,
                                     contentDescription = "Prev Ep",
-                                    tint = if (hasPrev) Color.White else Color.White.withOpacity(0.3f),
+                                    tint = if (hasPrev) Color.White else Color.White.copy(alpha = 0.3f),
                                     modifier = Modifier.size(32.dp)
                                 )
                             }
@@ -476,7 +476,7 @@ fun PlayerScreen(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.withOpacity(0.5f)),
+                                        .background(Color.Black.copy(alpha = 0.5f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(28.dp))
@@ -511,7 +511,7 @@ fun PlayerScreen(
                                 Icon(
                                     Icons.Rounded.SkipNext,
                                     contentDescription = "Next Ep",
-                                    tint = if (hasNext) Color.White else Color.White.withOpacity(0.3f),
+                                    tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.3f),
                                     modifier = Modifier.size(32.dp)
                                 )
                             }
@@ -538,7 +538,7 @@ fun PlayerScreen(
                                 colors = SliderDefaults.colors(
                                     thumbColor = WibukuPrimary,
                                     activeTrackColor = WibukuPrimary,
-                                    inactiveTrackColor = Color.White.withOpacity(0.3f)
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
                                 )
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -569,7 +569,7 @@ fun PlayerScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.ellipsis
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -625,7 +625,7 @@ fun PlayerScreen(
                                         color = if (isCurrent) WibukuPrimary else WibukuText,
                                         fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                                         maxLines = 1,
-                                        overflow = TextOverflow.ellipsis
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     if (ep.date.isNotEmpty()) {
                                         Text(

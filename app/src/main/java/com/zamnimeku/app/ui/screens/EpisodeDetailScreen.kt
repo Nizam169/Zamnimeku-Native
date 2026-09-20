@@ -74,7 +74,7 @@ fun EpisodeDetailScreen(
                     Text(
                         text = detail?.title ?: animeTitle,
                         maxLines = 1,
-                        overflow = TextOverflow.ellipsis,
+                        overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -256,7 +256,7 @@ fun EpisodeDetailScreen(
                                             style = MaterialTheme.typography.titleSmall,
                                             color = if (isWatched) WibukuPrimary else WibukuText,
                                             maxLines = 1,
-                                            overflow = TextOverflow.ellipsis
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         if (ep.date.isNotEmpty()) {
                                             Text(

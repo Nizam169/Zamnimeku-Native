@@ -148,7 +148,7 @@ fun HistoryScreen(
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
-                                        overflow = TextOverflow.ellipsis
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
@@ -157,7 +157,7 @@ fun HistoryScreen(
                                         color = WibukuPrimary,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
-                                        overflow = TextOverflow.ellipsis
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     LinearProgressIndicator(
