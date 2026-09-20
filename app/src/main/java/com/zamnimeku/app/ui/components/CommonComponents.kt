@@ -313,7 +313,7 @@ fun QualitySelectionDialog(
                                 onQualitySelected(q)
                                 onDismiss()
                             },
-                        color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08)
+                        color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f)
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),

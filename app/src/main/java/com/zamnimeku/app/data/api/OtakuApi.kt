@@ -299,9 +299,9 @@ object OtakuApi {
         val matcher = pattern.matcher(src)
         if (!matcher.find()) return src
 
-        var p = matcher.group(1)!!.replace("\\'", "'")
-        val a = matcher.group(2)!!.toIntOrNull() ?: 10
-        val k = matcher.group(4)!!.split("|")
+        var p = matcher.group(1)!!!!!.replace("\\'", "'")
+        val a = matcher.group(2)!!!!.toIntOrNull() ?: 10
+        val k = matcher.group(4)!!!!.split("|")
 
         val wordPattern = Pattern.compile("\\b\\w+\\b")
         val wordMatcher = wordPattern.matcher(p)
@@ -334,7 +334,7 @@ object OtakuApi {
             // 1. Tag source (ondesuhd, ondesu, otakuwatch)
             val sourceMatch = Pattern.compile("""<source[^>]+src=["']([^"']+)["']""").matcher(html)
             if (sourceMatch.find()) {
-                val u = sourceMatch.group(1)!
+                val u = sourceMatch.group(1)!!!!
                 if (!u.contains("googlevideo.com") || !u.contains("&ip=")) {
                     return u
                 }
@@ -349,7 +349,7 @@ object OtakuApi {
             // 3. var vs = { file: "..." } (arcg / playerjs)
             val fm = Pattern.compile("""file\s*:\s*["']([^"']+)["']""").matcher(html)
             if (fm.find()) {
-                val u = fm.group(1)!
+                val u = fm.group(1)!!!!
                 if (u.startsWith("http")) return u
             }
 
@@ -358,12 +358,12 @@ object OtakuApi {
                 val code = unpackPacker(html)
                 val m3u8Match = Pattern.compile("""["'](https?://[^"'\s]+\.m3u8[^"'\s]*)["']""").matcher(code)
                 if (m3u8Match.find()) {
-                    val m3u8 = m3u8Match.group(1)!
+                    val m3u8 = m3u8Match.group(1)!!!!
                     if (!m3u8.startsWith("/dl?")) return m3u8
                 }
                 val mp4Match = Pattern.compile("""["'](https?://[^"'\s]+\.mp4[^"'\s]*)["']""").matcher(code)
                 if (mp4Match.find()) {
-                    val mp4 = mp4Match.group(1)!
+                    val mp4 = mp4Match.group(1)!!!!
                     if (!mp4.startsWith("/dl?")) return mp4
                 }
             }
@@ -371,14 +371,14 @@ object OtakuApi {
             // 5. Generic direct mp4 / m3u8
             val p1 = Pattern.compile("""["'](https?://[^"'\s]+\.mp4[^"'\s]*)["']""").matcher(html)
             if (p1.find()) {
-                val u = p1.group(1)!
+                val u = p1.group(1)!!!!
                 if (!u.startsWith("/dl?") && (!u.contains("googlevideo.com") || !u.contains("&ip="))) {
                     return u
                 }
             }
             val p2 = Pattern.compile("""["'](https?://[^"'\s]+\.m3u8[^"'\s]*)["']""").matcher(html)
             if (p2.find()) {
-                val u = p2.group(1)!
+                val u = p2.group(1)!!!!
                 if (!u.startsWith("/dl?") && (!u.contains("googlevideo.com") || !u.contains("&ip="))) {
                     return u
                 }
@@ -496,7 +496,7 @@ object OtakuApi {
                                         val iframeHtml = String(Base64.decode(b64Norm, Base64.DEFAULT))
                                         val iframeSrc = Pattern.compile("""src=["']([^"']+)["']""").matcher(iframeHtml)
                                         if (iframeSrc.find()) {
-                                            val embedUrl = iframeSrc.group(1)!
+                                            val embedUrl = iframeSrc.group(1)!!!!
                                             val v = extractVideoFromEmbed(embedUrl)
                                             if (!v.isNullOrEmpty()) {
                                                 addUrl(quality, v)

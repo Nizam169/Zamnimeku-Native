@@ -318,7 +318,7 @@ fun PlayerScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(errorMessage!, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                            Text(errorMessage ?: "Terjadi kesalahan", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(

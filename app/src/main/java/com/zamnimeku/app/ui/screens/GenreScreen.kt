@@ -192,8 +192,9 @@ fun GenreScreen(
                 }
 
                 LaunchedEffect(shouldLoadMore.value) {
-                    if (shouldLoadMore.value && !isLoadingMore && !isLoadingAnime && selectedGenre != null) {
-                        loadAnimeForGenre(selectedGenre!, initial = false)
+                    val g = selectedGenre
+                    if (shouldLoadMore.value && !isLoadingMore && !isLoadingAnime && g != null) {
+                        loadAnimeForGenre(g, initial = false)
                     }
                 }
             }
