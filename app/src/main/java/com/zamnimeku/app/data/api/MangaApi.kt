@@ -49,7 +49,7 @@ object MangaApi {
         val rendered = item.optJSONObject("content")?.optString("rendered") ?: ""
         val m = Pattern.compile("""<img[^>]+src=["']([^"']+)["']""").matcher(rendered)
         if (m.find()) {
-            return m.group(1)!!!!
+            return m.group(1)!!
         }
         return THUMB_FALLBACK
     }
