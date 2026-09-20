@@ -7,19 +7,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.PlayCircleFilled
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -201,7 +200,6 @@ fun EpisodeDetailScreen(
 
                     // Episodes Header
                     item {
-                        PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -217,10 +215,12 @@ fun EpisodeDetailScreen(
                         }
                     }
 
-                    // Episode List
+                    // ── DAFTAR EPISODE DENGAN TIMELINE WATCH PROGRESS ──
                     itemsIndexed(d.episodes) { index, ep ->
-                        val isWatched = lastWatched?.lastEpSlug == ep.slug
-                        val progress = if (isWatched) lastWatched?.progress ?: 0f else 0f
+                        val epProg = prefs.getEpisodeProgress(ep.slug)
+                        val hasWatched = epProg > 0f
+                        val isDone = epProg >= 0.9f
+                        val isLastWatched = lastWatched?.lastEpSlug == ep.slug
 
                         Card(
                             modifier = Modifier
@@ -232,7 +232,7 @@ fun EpisodeDetailScreen(
                                 },
                             shape = RoundedCornerShape(10.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isWatched) WibukuBadge else WibukuSurface
+                                containerColor = if (isLastWatched) WibukuBadge else WibukuSurface
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
@@ -242,9 +242,9 @@ fun EpisodeDetailScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        imageVector = if (progress >= 0.9f) Icons.Rounded.CheckCircle else Icons.Rounded.PlayCircle,
+                                        imageVector = if (isDone) Icons.Rounded.CheckCircle else if (hasWatched) Icons.Rounded.PlayCircleFilled else Icons.Rounded.PlayCircle,
                                         contentDescription = null,
-                                        tint = if (isWatched) WibukuPrimary else WibukuMuted,
+                                        tint = if (isDone) Color(0xFF10B981) else if (hasWatched) Color(0xFFE74C3C) else WibukuMuted,
                                         modifier = Modifier.size(26.dp)
                                     )
 
@@ -254,7 +254,8 @@ fun EpisodeDetailScreen(
                                         Text(
                                             text = ep.title,
                                             style = MaterialTheme.typography.titleSmall,
-                                            color = if (isWatched) WibukuPrimary else WibukuText,
+                                            color = if (isLastWatched) WibukuPrimary else WibukuText,
+                                            fontWeight = if (isLastWatched || hasWatched) FontWeight.Bold else FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -268,16 +269,17 @@ fun EpisodeDetailScreen(
                                     }
                                 }
 
-                                if (progress > 0f) {
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                // ── PROGRESS TIMELINE BAR ALA FLUTTER ──
+                                if (hasWatched) {
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     LinearProgressIndicator(
-                                        progress = { progress },
+                                        progress = { epProg },
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(3.dp)
+                                            .height(4.dp)
                                             .clip(RoundedCornerShape(2.dp)),
-                                        color = WibukuPrimary,
-                                        trackColor = WibukuBorder
+                                        color = if (isDone) WibukuPrimary else Color(0xFFE74C3C),
+                                        trackColor = Color(0xFFBECFDE)
                                     )
                                 }
                             }

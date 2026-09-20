@@ -145,7 +145,7 @@ fun PlayerScreen(
         }
     }
 
-    // Save Progress Periodic
+    // Save Progress Periodic & Update Episode Timeline
     LaunchedEffect(isPlaying, currentPositionMs) {
         while (isPlaying) {
             currentPositionMs = exoPlayer.currentPosition
@@ -186,6 +186,13 @@ fun PlayerScreen(
             val mediaItem = MediaItem.fromUri(Uri.parse(url))
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
+
+            // Resume Position jika pernah ditonton
+            val resumePos = prefs.getEpisodePosition(currentEp.slug)
+            if (resumePos > 2000L) {
+                exoPlayer.seekTo(resumePos)
+            }
+
             exoPlayer.playWhenReady = true
         } catch (e: Exception) {
             errorMessage = "Gagal memuat URL: ${e.message}"
@@ -601,6 +608,10 @@ fun PlayerScreen(
                 ) {
                     itemsIndexed(episodes) { index, ep ->
                         val isCurrent = index == currentEpIndex
+                        val epProg = prefs.getEpisodeProgress(ep.slug)
+                        val hasWatched = epProg > 0f
+                        val isDone = epProg >= 0.9f
+
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -614,37 +625,51 @@ fun PlayerScreen(
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (isCurrent) Icons.Rounded.PlayCircleFilled else Icons.Rounded.PlayCircleOutline,
-                                    contentDescription = null,
-                                    tint = if (isCurrent) WibukuPrimary else WibukuMuted,
-                                    modifier = Modifier.size(24.dp)
-                                )
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = ep.title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = if (isCurrent) WibukuPrimary else WibukuText,
-                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (isDone) Icons.Rounded.CheckCircle else if (isCurrent || hasWatched) Icons.Rounded.PlayCircleFilled else Icons.Rounded.PlayCircleOutline,
+                                        contentDescription = null,
+                                        tint = if (isCurrent) WibukuPrimary else if (isDone) Color(0xFF10B981) else if (hasWatched) Color(0xFFE74C3C) else WibukuMuted,
+                                        modifier = Modifier.size(24.dp)
                                     )
-                                    if (ep.date.isNotEmpty()) {
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = ep.date,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontSize = 11.sp
+                                            text = ep.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = if (isCurrent) WibukuPrimary else WibukuText,
+                                            fontWeight = if (isCurrent || hasWatched) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
+                                        if (ep.date.isNotEmpty()) {
+                                            Text(
+                                                text = ep.date,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontSize = 11.sp
+                                            )
+                                        }
                                     }
+                                }
+
+                                // ── TIMELINE WATCH PROGRESS BAR ──
+                                if (hasWatched && !isCurrent) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    LinearProgressIndicator(
+                                        progress = { epProg },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = if (isDone) WibukuPrimary else Color(0xFFE74C3C),
+                                        trackColor = Color(0xFFBECFDE)
+                                    )
                                 }
                             }
                         }

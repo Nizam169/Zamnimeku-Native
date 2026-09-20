@@ -12,14 +12,34 @@ class AppPreferences(context: Context) {
     companion object {
         private const val KEY_PREFERRED_QUALITY = "preferred_quality"
         private const val KEY_WATCHED_ANIMES = "watched_animes_json"
-        private const val KEY_BOOKMARKS = "manga_bookmarks_json"
     }
 
     var preferredQuality: String
         get() = prefs.getString(KEY_PREFERRED_QUALITY, "360p") ?: "360p"
         set(value) = prefs.edit().putString(KEY_PREFERRED_QUALITY, value).apply()
 
+    // ── PROGRESS PER EPISODE (TIMELINE BAR) ──
+    fun saveEpisodeProgress(epSlug: String, positionMs: Long, durationMs: Long) {
+        if (durationMs <= 0) return
+        val progress = (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+        prefs.edit()
+            .putFloat("watch_prog_$epSlug", progress)
+            .putLong("watch_pos_$epSlug", positionMs)
+            .putLong("watch_dur_$epSlug", durationMs)
+            .apply()
+    }
+
+    fun getEpisodeProgress(epSlug: String): Float {
+        return prefs.getFloat("watch_prog_$epSlug", 0f)
+    }
+
+    fun getEpisodePosition(epSlug: String): Long {
+        return prefs.getLong("watch_pos_$epSlug", 0L)
+    }
+
+    // ── RIWAYAT ANIME UNIK ──
     fun saveHistory(item: HistoryItem) {
+        saveEpisodeProgress(item.lastEpSlug, item.positionMs, item.durationMs)
         val list = getHistory().toMutableList()
         val existingIndex = list.indexOfFirst { it.animeSlug == item.animeSlug }
         if (existingIndex != -1) {
