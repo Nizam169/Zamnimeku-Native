@@ -84,15 +84,15 @@ fun MangaReaderScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 4.dp)
+                    // Tanpa padding/seam: halaman nempel full-bleed selebar layar
+                    contentPadding = PaddingValues(0.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     itemsIndexed(images) { index, imgUrl ->
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .defaultMinSize(minHeight = 250.dp)
-                                .background(Color(0xFF0F172A)),
-                            contentAlignment = Alignment.Center
+                                .background(Color(0xFF0F172A))
                         ) {
                             SubcomposeAsyncImage(
                                 model = ImageRequest.Builder(context)
@@ -101,7 +101,9 @@ fun MangaReaderScreen(
                                     .addHeader("Referer", "https://www.mynimeku.com/")
                                     .build(),
                                 contentDescription = "Halaman ${index + 1}",
+                                // FillWidth + TopCenter = selebar layar, disambung dari atas
                                 contentScale = ContentScale.FillWidth,
+                                alignment = Alignment.TopCenter,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .wrapContentHeight(),

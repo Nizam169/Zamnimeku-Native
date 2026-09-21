@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -183,7 +184,7 @@ fun HomeScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp),
+                                .height(52.dp),
                             color = Color.White,
                             shape = RoundedCornerShape(12.dp),
                             shadowElevation = 1.dp
@@ -209,6 +210,11 @@ fun HomeScreen(
                                     },
                                     placeholder = { Text("Cari anime...", color = WibukuMuted, fontSize = 13.sp) },
                                     singleLine = true,
+                                    textStyle = TextStyle(
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp,
+                                        color = WibukuText
+                                    ),
                                     colors = TextFieldDefaults.colors(
                                         focusedContainerColor = Color.Transparent,
                                         unfocusedContainerColor = Color.Transparent,
@@ -236,7 +242,7 @@ fun HomeScreen(
 
                         Box(
                             modifier = Modifier
-                                .size(46.dp)
+                                .size(52.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(WibukuPrimary)
                                 .clickable { doSearch(searchQuery) },
