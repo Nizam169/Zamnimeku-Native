@@ -48,11 +48,12 @@ fun EpisodeDetailScreen(
     var detail by remember { mutableStateOf<AnimeDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var retryTrigger by remember { mutableStateOf(0) }
 
     val history = remember { prefs.getHistory() }
     val lastWatched = history.firstOrNull { it.animeSlug == animeSlug }
 
-    LaunchedEffect(animeSlug) {
+    LaunchedEffect(animeSlug, retryTrigger) {
         isLoading = true
         errorMessage = null
         try {
@@ -96,7 +97,7 @@ fun EpisodeDetailScreen(
             if (isLoading) {
                 LoadingView(text = "Memuat episode & informasi...")
             } else if (errorMessage != null || detail == null) {
-                ErrorView(message = errorMessage ?: "Data tidak ditemukan", onRetry = { /* reload */ })
+                ErrorView(message = errorMessage ?: "Data tidak ditemukan", onRetry = { retryTrigger++ })
             } else {
                 val d = detail!!
                 LazyColumn(

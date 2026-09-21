@@ -26,9 +26,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.ui.components.ErrorView
+import com.zamnimeku.app.ui.components.LoadingView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,9 +78,15 @@ class ScheduleViewModel : ViewModel() {
     private val _days = MutableStateFlow<List<DayItem>>(emptyList())
     val days: StateFlow<List<DayItem>> = _days.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     init {
         initDays()
-        generateSchedules()
+        loadRealSchedule()
     }
 
     private fun initDays() {
@@ -109,6 +118,66 @@ class ScheduleViewModel : ViewModel() {
 
     fun selectDay(index: Int) {
         _selectedDayIndex.value = (index + 7) % 7
+    }
+
+    fun retry() {
+        loadRealSchedule()
+    }
+
+    private fun dayNameToIndex(name: String): Int {
+        val n = name.lowercase()
+        return when {
+            n.contains("minggu") || n.contains("sunday") -> 0
+            n.contains("senin") || n.contains("monday") -> 1
+            n.contains("selasa") || n.contains("tuesday") -> 2
+            n.contains("rabu") || n.contains("wednes") -> 3
+            n.contains("kamis") || n.contains("thurs") -> 4
+            n.contains("jumat") || n.contains("friday") -> 5
+            n.contains("sabtu") || n.contains("satur") -> 6
+            else -> -1
+        }
+    }
+
+    private fun loadRealSchedule() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                val real = OtakuApi.getSchedule()
+                if (real.isEmpty()) {
+                    _errorMessage.value = "Jadwal tidak ditemukan."
+                    _scheduleMap.value = emptyMap()
+                } else {
+                    val mapped = mutableMapOf<Int, MutableList<AnimeSchedule>>()
+                    for (day in real) {
+                        val idx = dayNameToIndex(day.day)
+                        if (idx == -1) continue
+                        val list = day.animes.map { card ->
+                            AnimeSchedule(
+                                title = card.title,
+                                slug = card.slug,
+                                episode = card.episode.ifEmpty { card.date.ifEmpty { "-" } },
+                                time = "-",
+                                views = "-",
+                                rating = card.score.ifEmpty { "-" },
+                                posterUrl = card.thumb,
+                                isAired = true
+                            )
+                        }
+                        mapped.getOrPut(idx) { mutableListOf() }.addAll(list)
+                    }
+                    _scheduleMap.value = mapped
+                    if (mapped.isEmpty()) {
+                        _errorMessage.value = "Jadwal tidak ditemukan."
+                    }
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Gagal memuat jadwal: ${e.message}"
+                _scheduleMap.value = emptyMap()
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 
     private fun generateSchedules() {
@@ -183,9 +252,10 @@ fun ScheduleScreen(
     val selectedDayIndex by viewModel.selectedDayIndex.collectAsState()
     val scheduleMap by viewModel.scheduleMap.collectAsState()
     val days by viewModel.days.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     val currentAnimeList = scheduleMap[selectedDayIndex] ?: emptyList()
-    val currentDay = days.getOrNull(selectedDayIndex)
 
     val prevDayName = days.getOrNull((selectedDayIndex - 1 + 7) % 7)?.fullName ?: "Kemarin"
     val nextDayName = days.getOrNull((selectedDayIndex + 1) % 7)?.fullName ?: "Besok"
@@ -235,6 +305,17 @@ fun ScheduleScreen(
                 .padding(paddingValues)
                 .background(ColorBgScreen)
         ) {
+            when {
+                isLoading -> LoadingView(text = "Memuat jadwal rilis...")
+                errorMessage != null && currentAnimeList.isEmpty() -> ErrorView(
+                    message = errorMessage ?: "Gagal memuat jadwal",
+                    onRetry = { viewModel.retry() }
+                )
+                currentAnimeList.isEmpty() -> ErrorView(
+                    message = "Belum ada jadwal untuk hari ini.",
+                    onRetry = { viewModel.retry() }
+                )
+                else -> {
             // 3. LIST ANIME (LazyColumn, spasi 12dp, padding 16dp)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -246,6 +327,8 @@ fun ScheduleScreen(
                         anime = anime,
                         onClick = { onAnimeClick(anime.slug, anime.title, anime.posterUrl) }
                     )
+                }
+            }
                 }
             }
 

@@ -43,16 +43,9 @@ fun MangaReaderScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showControls by remember { mutableStateOf(true) }
+    var retryTrigger by remember { mutableStateOf(0) }
 
-    fun loadImages() {
-        isLoading = true
-        errorMessage = null
-        kotlinx.coroutines.GlobalScope.let {
-            // will be launched in LaunchedEffect
-        }
-    }
-
-    LaunchedEffect(chapterSlug) {
+    LaunchedEffect(chapterSlug, retryTrigger) {
         isLoading = true
         errorMessage = null
         try {
@@ -85,10 +78,7 @@ fun MangaReaderScreen(
             } else if (errorMessage != null) {
                 ErrorView(
                     message = errorMessage ?: "Terjadi kesalahan",
-                    onRetry = {
-                        isLoading = true
-                        errorMessage = null
-                    }
+                    onRetry = { retryTrigger++ }
                 )
             } else {
                 LazyColumn(

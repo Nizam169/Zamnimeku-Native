@@ -68,7 +68,7 @@ fun AppBottomBar(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    NavTab.values().forEach { tab ->
+                    NavTab.entries.forEach { tab ->
                         val isSelected = tab == currentTab
                         val bgColor by animateColorAsState(
                             targetValue = if (isSelected) WibukuPrimary else Color.Transparent,

@@ -44,8 +44,9 @@ fun MangaDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isAscending by remember { mutableStateOf(false) }
+    var retryTrigger by remember { mutableStateOf(0) }
 
-    LaunchedEffect(mangaSlug) {
+    LaunchedEffect(mangaSlug, retryTrigger) {
         isLoading = true
         errorMessage = null
         try {
@@ -89,7 +90,7 @@ fun MangaDetailScreen(
             if (isLoading) {
                 LoadingView(text = "Memuat detail komik & chapter...")
             } else if (errorMessage != null || detail == null) {
-                ErrorView(message = errorMessage ?: "Data komik tidak ditemukan", onRetry = { /* retry */ })
+                ErrorView(message = errorMessage ?: "Data komik tidak ditemukan", onRetry = { retryTrigger++ })
             } else {
                 val d = detail!!
                 val displayChapters = if (isAscending) d.chapters.reversed() else d.chapters
