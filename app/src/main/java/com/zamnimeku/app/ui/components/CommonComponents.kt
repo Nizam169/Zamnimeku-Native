@@ -230,11 +230,14 @@ fun MangaCardView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.72f)
+                    .background(WibukuBadge)
             ) {
                 AsyncImage(
                     model = manga.thumb,
                     contentDescription = manga.title,
-                    contentScale = ContentScale.Crop,
+                    // Fit = seluruh foto tampil, tidak kepotong.
+                    // Latar WibukuBadge mengisi sisa ruang kalau rasio beda.
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
             }

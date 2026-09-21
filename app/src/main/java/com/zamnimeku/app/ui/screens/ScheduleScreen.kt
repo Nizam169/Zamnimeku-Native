@@ -32,10 +32,14 @@ import coil.compose.AsyncImage
 import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 // ─── PALET WARNA RESMI TEMA TERANG ──────────────────────────────────────────
@@ -117,11 +121,17 @@ class ScheduleViewModel : ViewModel() {
     }
 
     fun selectDay(index: Int) {
-        _selectedDayIndex.value = (index + 7) % 7
+        val normalized = (index + 7) % 7
+        _selectedDayIndex.value = normalized
+        fetchDetailsForDay(normalized)
     }
 
     fun retry() {
         loadRealSchedule()
+    }
+
+    private fun todayIndex(): Int {
+        return (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1).coerceIn(0, 6)
     }
 
     private fun dayNameToIndex(name: String): Int {
@@ -138,37 +148,55 @@ class ScheduleViewModel : ViewModel() {
         }
     }
 
+    private val thumbCache = mutableMapOf<String, String>()
+    private val scoreCache = mutableMapOf<String, String>()
+    private val totalEpCache = mutableMapOf<String, String>()
+
     private fun loadRealSchedule() {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val real = OtakuApi.getSchedule()
+                val real = withContext(Dispatchers.IO) { OtakuApi.getSchedule() }
                 if (real.isEmpty()) {
                     _errorMessage.value = "Jadwal tidak ditemukan."
                     _scheduleMap.value = emptyMap()
                 } else {
+                    val today = todayIndex()
+                    val dateByDay = _days.value.associate { it.dayIndex to it.dateNum }
+                    val nameByDay = _days.value.associate { it.dayIndex to it.fullName }
                     val mapped = mutableMapOf<Int, MutableList<AnimeSchedule>>()
                     for (day in real) {
                         val idx = dayNameToIndex(day.day)
                         if (idx == -1) continue
+                        val dayName = nameByDay[idx] ?: day.day
+                        val dateNum = dateByDay[idx] ?: 0
+                        // Status tayang ngikutin hari: hari <= hari ini = sudah tayang
+                        val aired = idx <= today
                         val list = day.animes.map { card ->
                             AnimeSchedule(
                                 title = card.title,
                                 slug = card.slug,
-                                episode = card.episode.ifEmpty { card.date.ifEmpty { "-" } },
-                                time = "-",
+                                episode = "Setiap $dayName",
+                                time = if (dateNum > 0) "Tgl $dateNum" else "-",
                                 views = "-",
-                                rating = card.score.ifEmpty { "-" },
-                                posterUrl = card.thumb,
-                                isAired = true
+                                rating = "-",
+                                posterUrl = "",
+                                isAired = aired
                             )
                         }
                         mapped.getOrPut(idx) { mutableListOf() }.addAll(list)
                     }
+                    // Deduplikasi per hari (satu anime bisa muncul 2x di API)
+                    mapped.keys.forEach { k ->
+                        mapped[k] = mapped[k]!!.distinctBy { it.slug }.toMutableList()
+                    }
                     _scheduleMap.value = mapped
                     if (mapped.isEmpty()) {
                         _errorMessage.value = "Jadwal tidak ditemukan."
+                    } else {
+                        // Ambil foto + info episode di background untuk hari ini
+                        fetchDetailsForDay(_selectedDayIndex.value)
                     }
                 }
             } catch (e: Exception) {
@@ -177,6 +205,51 @@ class ScheduleViewModel : ViewModel() {
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    private fun fetchDetailsForDay(dayIdx: Int) {
+        val current = _scheduleMap.value[dayIdx] ?: return
+        val missing = current.filter { it.posterUrl.isEmpty() && !thumbCache.containsKey(it.slug) }
+        if (missing.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                val results = withContext(Dispatchers.IO) {
+                    missing.take(12).map { item ->
+                        async {
+                            try {
+                                val d = OtakuApi.getAnimeDetail(item.slug)
+                                if (d != null) {
+                                    thumbCache[item.slug] = d.thumb
+                                    scoreCache[item.slug] = d.score
+                                    totalEpCache[item.slug] = d.totalEpisodes
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }.awaitAll()
+                }
+                // Tempel hasil ke map supaya foto + tanggal update muncul
+                val updated = _scheduleMap.value.toMutableMap()
+                val dayName = _days.value.getOrNull(dayIdx)?.fullName ?: ""
+                val list = (updated[dayIdx] ?: return@launch).map { item ->
+                    val thumb = thumbCache[item.slug] ?: ""
+                    val score = scoreCache[item.slug] ?: "-"
+                    val total = totalEpCache[item.slug] ?: ""
+                    val epText = if (total.isNotEmpty() && total != "?" && total != "-") {
+                        "Total $total Ep • Setiap $dayName"
+                    } else {
+                        item.episode
+                    }
+                    item.copy(
+                        posterUrl = thumb,
+                        rating = score,
+                        views = if (total.isNotEmpty()) total else "-",
+                        episode = epText
+                    )
+                }
+                updated[dayIdx] = list.toMutableList()
+                _scheduleMap.value = updated
+            } catch (_: Exception) {}
         }
     }
 
@@ -470,12 +543,29 @@ fun AnimeScheduleCard(
                     .background(ColorPrimaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = anime.posterUrl,
-                    contentDescription = anime.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (anime.posterUrl.isNotEmpty()) {
+                    AsyncImage(
+                        model = anime.posterUrl,
+                        contentDescription = anime.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Placeholder selagi foto detail dimuat
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = ColorPrimary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Memuat...",
+                            fontSize = 10.sp,
+                            color = ColorTextSecondary
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -510,40 +600,45 @@ fun AnimeScheduleCard(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Baris Ikon Mata + Views & Ikon Bintang + Rating
+                // (disembunyikan kalau datanya "-" biar gak bug tampil strip)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.Visibility,
-                            contentDescription = "Views",
-                            tint = ColorTextSecondary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = anime.views,
-                            fontSize = 12.sp,
-                            color = ColorTextSecondary,
-                            fontWeight = FontWeight.Medium
-                        )
+                    if (anime.views.isNotEmpty() && anime.views != "-") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.Visibility,
+                                contentDescription = "Views",
+                                tint = ColorTextSecondary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "${anime.views} Ep",
+                                fontSize = 12.sp,
+                                color = ColorTextSecondary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.Star,
-                            contentDescription = "Rating",
-                            tint = ColorStar,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = anime.rating,
-                            fontSize = 12.sp,
-                            color = ColorTextSecondary,
-                            fontWeight = FontWeight.Bold
-                        )
+                    if (anime.rating.isNotEmpty() && anime.rating != "-") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.Star,
+                                contentDescription = "Rating",
+                                tint = ColorStar,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = anime.rating,
+                                fontSize = 12.sp,
+                                color = ColorTextSecondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
