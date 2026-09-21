@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.zamnimeku.app.data.api.MangaApi
 import com.zamnimeku.app.data.model.MangaChapter
 import com.zamnimeku.app.data.model.MangaDetail
@@ -108,7 +110,9 @@ fun MangaDetailScreen(
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(modifier = Modifier.fillMaxWidth()) {
-                                    AsyncImage(
+                                    // Cover judul: ada loading + ikon rusak supaya
+                                    // tidak kelihatan ngebug saat foto lambat/gagal
+                                    SubcomposeAsyncImage(
                                         model = d.thumb.ifEmpty { mangaThumb },
                                         contentDescription = d.title,
                                         contentScale = ContentScale.Crop,
@@ -116,6 +120,32 @@ fun MangaDetailScreen(
                                             .width(110.dp)
                                             .aspectRatio(0.72f)
                                             .clip(RoundedCornerShape(10.dp))
+                                            .background(WibukuBadge),
+                                        loading = {
+                                            Box(
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    color = WibukuPrimary,
+                                                    strokeWidth = 2.5.dp,
+                                                    modifier = Modifier.size(26.dp)
+                                                )
+                                            }
+                                        },
+                                        error = {
+                                            Box(
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    Icons.Rounded.BrokenImage,
+                                                    contentDescription = null,
+                                                    tint = WibukuMuted,
+                                                    modifier = Modifier.size(36.dp)
+                                                )
+                                            }
+                                        }
                                     )
 
                                     Spacer(modifier = Modifier.width(14.dp))

@@ -230,16 +230,26 @@ fun MangaCardView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.72f)
-                    .background(WibukuBadge)
+                    .background(WibukuBadge),
+                contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = manga.thumb,
-                    contentDescription = manga.title,
-                    // Fit = seluruh foto tampil, tidak kepotong.
-                    // Latar WibukuBadge mengisi sisa ruang kalau rasio beda.
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (manga.thumb.isNotEmpty()) {
+                    AsyncImage(
+                        model = manga.thumb,
+                        contentDescription = manga.title,
+                        // Fit = seluruh foto tampil, tidak kepotong.
+                        // Latar WibukuBadge mengisi sisa ruang kalau rasio beda.
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.MenuBook,
+                        contentDescription = null,
+                        tint = WibukuMuted,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
             Text(
                 text = manga.title,

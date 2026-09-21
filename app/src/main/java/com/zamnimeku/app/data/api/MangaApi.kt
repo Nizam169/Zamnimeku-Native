@@ -52,9 +52,18 @@ object MangaApi {
             }
         }
         val rendered = item.optJSONObject("content")?.optString("rendered") ?: ""
+        // Pakai URL full-res (srcset/data-src), bukan placeholder lazy-load
+        try {
+            val firstImg = Jsoup.parse(rendered).selectFirst("img")
+            if (firstImg != null) {
+                val best = bestImgUrl(firstImg)
+                if (best != null) return best
+            }
+        } catch (_: Exception) {}
         val m = Pattern.compile("""<img[^>]+src=["']([^"']+)["']""").matcher(rendered)
         if (m.find()) {
-            return m.group(1)!!
+            val raw = m.group(1)!!
+            if (isContentImage(raw)) return raw
         }
         return THUMB_FALLBACK
     }
@@ -124,7 +133,11 @@ object MangaApi {
 
         val doc = Jsoup.parse(html)
         val title = doc.selectFirst("h1.komik-series-title")?.text()?.trim() ?: komikSlug
-        val thumb = doc.selectFirst("div.komik-series-cover img")?.attr("src") ?: THUMB_FALLBACK
+        // Cover: ambil URL full-res + fallback berlapis supaya tidak placeholder rusak
+        val coverImg = doc.selectFirst("div.komik-series-cover img")
+            ?: doc.selectFirst("div.komik-series-cover source")
+            ?: doc.selectFirst("article img")
+        val thumb = coverImg?.let { bestImgUrl(it) } ?: THUMB_FALLBACK
         val synopsis = doc.select("div.komik-series-synopsis p").text().trim()
         val status = doc.selectFirst("div.komik-series-meta:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "Ongoing"
         val type = doc.selectFirst("div.komik-series-meta:contains(Type)")?.text()?.replace("Type:", "")?.trim() ?: "Manga"
