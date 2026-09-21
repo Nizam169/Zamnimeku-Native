@@ -74,6 +74,8 @@ fun PlayerScreen(
 
     var candidates by remember { mutableStateOf<List<VideoSource>>(emptyList()) }
     var selectedQuality by remember { mutableStateOf(prefs.preferredQuality) }
+    // URL yang sedang diputar — dipakai untuk deteksi "sumber sama"
+    var currentUrl by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -179,17 +181,23 @@ fun PlayerScreen(
         }
     }
 
-    fun playUrl(url: String) {
+    fun playUrl(url: String, resumeAt: Long? = null) {
         isLoading = true
         errorMessage = null
         try {
+            currentUrl = url
+            // Hentikan stream lama dulu supaya ganti sumber bersih
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
             val mediaItem = MediaItem.fromUri(Uri.parse(url))
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
 
-            // Resume Position jika pernah ditonton
-            val resumePos = prefs.getEpisodePosition(currentEp.slug)
-            if (resumePos > 2000L) {
+            // Pertahankan posisi putar saat ganti resolusi;
+            // kalau tidak ada, pakai posisi tersimpan seperti dulu
+            val resumePos = resumeAt?.takeIf { it > 2000L }
+                ?: prefs.getEpisodePosition(currentEp.slug).takeIf { it > 2000L }
+            if (resumePos != null) {
                 exoPlayer.seekTo(resumePos)
             }
 
@@ -204,6 +212,7 @@ fun PlayerScreen(
         scope.launch {
             isLoading = true
             errorMessage = null
+            currentUrl = ""
             try {
                 val list = OtakuApi.getVideoCandidates(currentEp.slug)
                 candidates = list
@@ -259,10 +268,18 @@ fun PlayerScreen(
                 prefs.preferredQuality = q
                 val cand = candidates.firstOrNull { it.quality == q } ?: candidates.firstOrNull()
                 if (cand != null) {
-                    playUrl(cand.url)
+                    if (cand.url == currentUrl && currentUrl.isNotEmpty()) {
+                        // Sumbernya sama persis dengan yang diputar — tidak perlu reload
+                    } else {
+                        // Lanjutkan dari detik yang sedang ditonton
+                        val keepPos = exoPlayer.currentPosition.coerceAtLeast(0L)
+                        playUrl(cand.url, resumeAt = keepPos)
+                    }
                 }
             },
-            onDismiss = { showQualityDialog = false }
+            onDismiss = { showQualityDialog = false },
+            qualityUrls = candidates.associate { it.quality to it.url },
+            currentUrl = currentUrl
         )
     }
 

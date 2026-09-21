@@ -314,7 +314,12 @@ fun ErrorView(
 fun QualitySelectionDialog(
     currentQuality: String,
     onQualitySelected: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    // Peta resolusi -> URL aktual dari server. Kalau kosong (belum dimuat),
+    // semua opsi tetap bisa diklik seperti dulu supaya tidak merusak alur lama.
+    qualityUrls: Map<String, String> = emptyMap(),
+    // URL yang sedang diputar — opsi dengan sumber identik ditandai
+    currentUrl: String = ""
 ) {
     val qualities = listOf(
         Pair("360p", "Hemat Kuota • Paling Cepat"),
@@ -336,18 +341,38 @@ fun QualitySelectionDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                // Kalau server cuma punya 1 sumber untuk semua resolusi,
+                // kasih tahu user supaya tidak dikira rusak.
+                val distinctUrls = qualityUrls.values.toSet()
+                if (qualityUrls.isNotEmpty() && distinctUrls.size <= 1) {
+                    Text(
+                        text = "Server hanya menyediakan 1 sumber untuk episode ini.",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
                 qualities.forEach { (q, desc) ->
                     val isSelected = q == currentQuality
+                    val itemUrl = qualityUrls[q]
+                    val hasUrl = qualityUrls.isEmpty() || itemUrl != null
+                    // Sumber identik dengan yang sedang diputar
+                    val sameSource = itemUrl != null && currentUrl.isNotEmpty() && itemUrl == currentUrl
+                    val descText = when {
+                        !hasUrl -> "Belum tersedia"
+                        sameSource && !isSelected -> "$desc • sumber sama"
+                        else -> desc
+                    }
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .clickable {
+                            .clickable(enabled = hasUrl) {
                                 onQualitySelected(q)
                                 onDismiss()
                             },
-                        color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f),
+                        color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = if (hasUrl) 0.08f else 0.04f),
                         shape = RoundedCornerShape(10.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) WibukuPrimary else Color.Transparent)
                     ) {
@@ -370,7 +395,7 @@ fun QualitySelectionDialog(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(text = q, color = if (isSelected) WibukuPrimary else Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(text = desc, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                                Text(text = descText, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
                             }
                             if (isSelected) {
                                 Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = WibukuPrimary, modifier = Modifier.size(20.dp))
