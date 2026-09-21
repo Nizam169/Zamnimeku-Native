@@ -10,6 +10,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -174,8 +175,67 @@ object MangaApi {
         chapters
     }
 
+    // Ambil URL gambar TERBESAR dari satu tag <img>:
+    // WordPress lazy-load sering menaruh placeholder kecil di "src",
+    // sedangkan gambar asli ada di "srcset"/"data-src"/"data-lazy-src".
+    private fun bestImgUrl(img: Element): String? {
+        fun largestFromSrcset(srcset: String): String? {
+            var bestUrl: String? = null
+            var bestScore = -1
+            for (part in srcset.split(",")) {
+                val tokens = part.trim().split(Regex("\\s+"))
+                if (tokens.isEmpty()) continue
+                val url = tokens[0]
+                if (!url.startsWith("http")) continue
+                var score = 0
+                if (tokens.size > 1) {
+                    val d = tokens[1]
+                    score = when {
+                        d.endsWith("w") -> d.dropLast(1).toIntOrNull() ?: 0
+                        d.endsWith("x") -> ((d.dropLast(1).toFloatOrNull() ?: 0f) * 1000).toInt()
+                        else -> 0
+                    }
+                }
+                if (score >= bestScore) {
+                    bestScore = score
+                    bestUrl = url
+                }
+            }
+            return bestUrl
+        }
+
+        // 1. srcset terbesar dulu (gambar full)
+        for (attr in listOf("srcset", "data-srcset", "data-lazy-srcset")) {
+            val v = img.attr(attr)
+            if (v.isNotEmpty()) {
+                val best = largestFromSrcset(v)
+                if (best != null && isContentImage(best)) return best
+            }
+        }
+        // 2. Atribut lazy-load / original
+        for (attr in listOf("data-src", "data-lazy-src", "data-original", "data-full-url", "src")) {
+            val v = img.attr(attr).trim()
+            if (v.startsWith("http") && isContentImage(v)) return v
+        }
+        return null
+    }
+
+    private fun isContentImage(url: String): Boolean {
+        if (!url.startsWith("http")) return false
+        if (url.startsWith("data:")) return false
+        val l = url.lowercase()
+        if (l.contains("icon-mynimeku") || l.contains("logo")) return false
+        if (l.contains("avatar") || l.contains("emoticon") || l.contains("smiley")) return false
+        if (l.contains("blank.gif") || l.contains("lazyload") || l.contains("placeholder")) return false
+        return true
+    }
+
     suspend fun getChapterImages(chapterSlug: String): List<String> = withContext(Dispatchers.IO) {
         val images = mutableListOf<String>()
+
+        fun addIfNew(url: String?) {
+            if (url != null && !images.contains(url)) images.add(url)
+        }
 
         // 1. Ambil dari WP REST API
         try {
@@ -187,29 +247,25 @@ object MangaApi {
                     val obj = arr.getJSONObject(0)
                     val rendered = obj.optJSONObject("content")?.optString("rendered") ?: ""
                     val doc = Jsoup.parse(rendered)
-                    val imgElements = doc.select("img")
-                    for (img in imgElements) {
-                        val src = img.attr("src")
-                        if (src.startsWith("http") && !images.contains(src)) {
-                            images.add(src)
-                        }
+                    for (img in doc.select("img")) {
+                        addIfNew(bestImgUrl(img))
                     }
                 }
             }
         } catch (_: Exception) {}
 
-        // 2. Fallback: Parse halaman HTML chapter langsung
+        // 2. Fallback: Parse halaman HTML chapter langsung.
+        //    Prioritas area bacaan dulu supaya tidak kecampur logo/banner
+        //    (yang kecil-kecil dan bikin halaman kelihatan sempit).
         if (images.isEmpty()) {
             try {
                 val html = getHtml("$BASE_URL/chapter/$chapterSlug/")
                 if (html.isNotEmpty()) {
                     val doc = Jsoup.parse(html)
-                    val imgElements = doc.select("div.main-reading-area img, div.reader-area img, img")
-                    for (img in imgElements) {
-                        val src = img.attr("src").ifEmpty { img.attr("data-src") }
-                        if (src.startsWith("http") && !images.contains(src) && !src.contains("icon-mynimeku") && !src.contains("logo")) {
-                            images.add(src)
-                        }
+                    val scoped = doc.select("div.main-reading-area img, div.reader-area img, div.entry-content img")
+                    val targets = if (scoped.isNotEmpty()) scoped else doc.select("img")
+                    for (img in targets) {
+                        addIfNew(bestImgUrl(img))
                     }
                 }
             } catch (_: Exception) {}
