@@ -63,7 +63,7 @@ object MangaApi {
         val m = Pattern.compile("""<img[^>]+src=["']([^"']+)["']""").matcher(rendered)
         if (m.find()) {
             val raw = m.group(1)!!
-            if (isContentImage(raw)) return raw
+            if (isContentImage(raw)) return normUrl(raw)
         }
         return THUMB_FALLBACK
     }
@@ -127,23 +127,45 @@ object MangaApi {
         list
     }
 
+    // Ambil nilai dari tabel info (th = label, td = nilai), mis. Status/Type/Author
+    private fun infoFromTable(doc: org.jsoup.nodes.Document, label: String): String {
+        for (tr in doc.select("table.komik-series-table tr")) {
+            val th = tr.selectFirst("th")?.text()?.trim() ?: continue
+            if (th.equals(label, ignoreCase = true)) {
+                return tr.selectFirst("td")?.text()?.trim() ?: ""
+            }
+        }
+        return ""
+    }
+
     suspend fun getMangaDetail(komikSlug: String): MangaDetail? = withContext(Dispatchers.IO) {
         val html = getHtml("$BASE_URL/komik/$komikSlug/")
         if (html.isEmpty()) return@withContext null
 
         val doc = Jsoup.parse(html)
-        val title = doc.selectFirst("h1.komik-series-title")?.text()?.trim() ?: komikSlug
+        // Template baru (hero) dulu, fallback ke template lama
+        val title = doc.selectFirst("h1.komik-series-hero__title")?.text()?.trim()
+            ?: doc.selectFirst("h1.komik-series-title")?.text()?.trim()
+            ?: Jsoup.parse(komikSlug.replace("-", " ")).text()
         // Cover: ambil URL full-res + fallback berlapis supaya tidak placeholder rusak
-        val coverImg = doc.selectFirst("div.komik-series-cover img")
-            ?: doc.selectFirst("div.komik-series-cover source")
+        val coverImg = doc.selectFirst("div.komik-series-hero__cover img")
+            ?: doc.selectFirst("div.komik-series-cover img")
             ?: doc.selectFirst("article img")
         val thumb = coverImg?.let { bestImgUrl(it) } ?: THUMB_FALLBACK
-        val synopsis = doc.select("div.komik-series-synopsis p").text().trim()
-        val status = doc.selectFirst("div.komik-series-meta:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "Ongoing"
-        val type = doc.selectFirst("div.komik-series-meta:contains(Type)")?.text()?.replace("Type:", "")?.trim() ?: "Manga"
-        val author = doc.selectFirst("div.komik-series-meta:contains(Author)")?.text()?.replace("Author:", "")?.trim() ?: "-"
+        val synopsis = doc.select("div.komik-series-hero__synopsis div.komik-series-entry p").text().trim()
+            .ifEmpty { doc.select("div.komik-series-synopsis p").text().trim() }
+        val status = infoFromTable(doc, "Status")
+            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "" }
+            .ifEmpty { "Ongoing" }
+        val type = infoFromTable(doc, "Type")
+            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Type)")?.text()?.replace("Type:", "")?.trim() ?: "" }
+            .ifEmpty { "Manga" }
+        val author = infoFromTable(doc, "Author")
+            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Author)")?.text()?.replace("Author:", "")?.trim() ?: "" }
+            .ifEmpty { "-" }
 
-        val genres = doc.select("div.komik-series-genres a").map { it.text().trim() }
+        val genres = doc.select("div.komik-series-taxonomy__terms a").map { it.text().trim() }
+            .ifEmpty { doc.select("div.komik-series-genres a").map { it.text().trim() } }
         val chapters = getChapters(komikSlug)
 
         MangaDetail(
@@ -188,6 +210,12 @@ object MangaApi {
         chapters
     }
 
+    // Normalisasi URL protokol-relatif (//host/path -> https://host/path)
+    private fun normUrl(u: String): String {
+        val t = u.trim()
+        return if (t.startsWith("//")) "https:$t" else t
+    }
+
     // Ambil URL gambar TERBESAR dari satu tag <img>:
     // WordPress lazy-load sering menaruh placeholder kecil di "src",
     // sedangkan gambar asli ada di "srcset"/"data-src"/"data-lazy-src".
@@ -222,21 +250,29 @@ object MangaApi {
             val v = img.attr(attr)
             if (v.isNotEmpty()) {
                 val best = largestFromSrcset(v)
-                if (best != null && isContentImage(best)) return best
+                if (best != null && isContentImage(best)) return normUrl(best)
             }
         }
         // 2. Atribut lazy-load / original
-        for (attr in listOf("data-src", "data-lazy-src", "data-original", "data-full-url", "src")) {
-            val v = img.attr(attr).trim()
-            if (v.startsWith("http") && isContentImage(v)) return v
+        for (attr in listOf("data-lazy-src", "data-src", "data-original", "data-full-url", "src")) {
+            val v = normUrl(img.attr(attr))
+            if (isContentImage(v)) return v
+        }
+        // 3. noscript fallback (tema MyNimeku menaruh img asli di <noscript>)
+        val noscriptImg = img.parent()?.selectFirst("noscript img")
+            ?: img.nextElementSibling()?.selectFirst("img")
+        if (noscriptImg != null) {
+            val v = normUrl(noscriptImg.attr("src"))
+            if (isContentImage(v)) return v
         }
         return null
     }
 
     private fun isContentImage(url: String): Boolean {
-        if (!url.startsWith("http")) return false
-        if (url.startsWith("data:")) return false
-        val l = url.lowercase()
+        val n = normUrl(url)
+        if (!n.startsWith("http")) return false
+        if (n.startsWith("data:")) return false
+        val l = n.lowercase()
         if (l.contains("icon-mynimeku") || l.contains("logo")) return false
         if (l.contains("avatar") || l.contains("emoticon") || l.contains("smiley")) return false
         if (l.contains("blank.gif") || l.contains("lazyload") || l.contains("placeholder")) return false
