@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +47,9 @@ fun MangaReaderScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showControls by remember { mutableStateOf(true) }
     var retryTrigger by remember { mutableStateOf(0) }
+    // Mode full-halaman: 1 nomor = 1 layar penuh, seluruh foto kelihatan (Fit).
+    // Bisa diganti ke mode scroll panjang lewat tombol di top bar.
+    var pagerMode by remember { mutableStateOf(true) }
 
     LaunchedEffect(chapterSlug, retryTrigger) {
         isLoading = true
@@ -61,6 +67,13 @@ fun MangaReaderScreen(
 
     val listState = rememberLazyListState()
     val firstVisibleItemIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
+    val pagerState = rememberPagerState(pageCount = { images.size })
+    // Nomor halaman yang tampil di pill bawah
+    val displayIndex = if (pagerMode) {
+        if (images.isNotEmpty()) pagerState.currentPage else 0
+    } else {
+        firstVisibleItemIndex
+    }
 
     Scaffold(
         containerColor = Color(0xFF1E293B)
@@ -80,6 +93,56 @@ fun MangaReaderScreen(
                     message = errorMessage ?: "Terjadi kesalahan",
                     onRetry = { retryTrigger++ }
                 )
+            } else if (pagerMode) {
+                // MODE FULL-HALAMAN: 1 nomor = 1 layar penuh, geser kiri-kanan.
+                // Fit = seluruh foto kelihatan utuh dalam layar.
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    val imgUrl = images[page]
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF0F172A)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SubcomposeAsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(imgUrl)
+                                .crossfade(true)
+                                .addHeader("Referer", "https://www.mynimeku.com/")
+                                .build(),
+                            contentDescription = "Halaman ${page + 1}",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                            loading = {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Halaman ${page + 1}",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            },
+                            error = {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Gagal memuat halaman ${page + 1}", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                                }
+                            }
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     state = listState,
@@ -169,8 +232,17 @@ fun MangaReaderScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
+                        // Ganti mode: full-halaman per nomor <-> scroll panjang
+                        IconButton(onClick = { pagerMode = !pagerMode }) {
+                            Icon(
+                                Icons.Rounded.SwapVert,
+                                contentDescription = if (pagerMode) "Mode scroll" else "Mode full-halaman",
+                                tint = if (pagerMode) WibukuPrimary else Color.White
+                            )
+                        }
                     }
                 }
             }
@@ -186,7 +258,7 @@ fun MangaReaderScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, WibukuPrimary.copy(alpha = 0.6f))
                 ) {
                     Text(
-                        text = "${firstVisibleItemIndex + 1} / ${images.size}",
+                        text = "${displayIndex + 1} / ${images.size}",
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
