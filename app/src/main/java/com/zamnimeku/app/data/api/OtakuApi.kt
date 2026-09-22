@@ -238,13 +238,13 @@ object OtakuApi {
         val thumb = doc.selectFirst("div.fotoanime img")?.attr("src") ?: ""
         val synopsis = doc.select("div.sinopc p").text().trim()
         val score = cleanField(doc.selectFirst("div.infozingle p:contains(Skor)")?.text()?.replace("Skor:", "") ?: "").ifEmpty { "-" }
-        val producer = doc.selectFirst("div.infozingle p:contains(Produser)")?.text()?.replace("Produser:", "")?.trim() ?: "-"
-        val type = doc.selectFirst("div.infozingle p:contains(Tipe)")?.text()?.replace("Tipe:", "")?.trim() ?: "Anime"
-        val status = doc.selectFirst("div.infozingle p:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "Ongoing"
+        val producer = cleanField(doc.selectFirst("div.infozingle p:contains(Produser)")?.text()?.replace("Produser:", "") ?: "").ifEmpty { "-" }
+        val type = cleanField(doc.selectFirst("div.infozingle p:contains(Tipe)")?.text()?.replace("Tipe:", "") ?: "").ifEmpty { "Anime" }
+        val status = cleanField(doc.selectFirst("div.infozingle p:contains(Status)")?.text()?.replace("Status:", "") ?: "").ifEmpty { "Ongoing" }
         val rawTotalEp = doc.selectFirst("div.infozingle p:contains(Total Episode)")?.text()?.replace("Total Episode:", "")?.trim() ?: "?"
-        val duration = doc.selectFirst("div.infozingle p:contains(Durasi)")?.text()?.replace("Durasi:", "")?.trim() ?: "24 min"
-        val releaseDate = doc.selectFirst("div.infozingle p:contains(Tanggal Rilis)")?.text()?.replace("Tanggal Rilis:", "")?.trim() ?: "-"
-        val studio = doc.selectFirst("div.infozingle p:contains(Studio)")?.text()?.replace("Studio:", "")?.trim() ?: "-"
+        val duration = cleanField(doc.selectFirst("div.infozingle p:contains(Durasi)")?.text()?.replace("Durasi:", "") ?: "").ifEmpty { "24 min" }
+        val releaseDate = cleanField(doc.selectFirst("div.infozingle p:contains(Tanggal Rilis)")?.text()?.replace("Tanggal Rilis:", "") ?: "").ifEmpty { "-" }
+        val studio = cleanField(doc.selectFirst("div.infozingle p:contains(Studio)")?.text()?.replace("Studio:", "") ?: "").ifEmpty { "-" }
 
         val genreList = doc.select("div.infozingle p:contains(Genre) a").map { it.text().trim() }
 

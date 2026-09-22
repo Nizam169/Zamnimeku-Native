@@ -127,6 +127,12 @@ object MangaApi {
         list
     }
 
+    // Normalisasi "Unknown"/"?" dari situs jadi string netral untuk UI
+    private fun cleanInfo(s: String, fallback: String): String {
+        val t = s.trim()
+        return if (t.isEmpty() || t == "?" || t.equals("Unknown", ignoreCase = true)) fallback else t
+    }
+
     // Ambil nilai dari tabel info (th = label, td = nilai), mis. Status/Type/Author
     private fun infoFromTable(doc: org.jsoup.nodes.Document, label: String): String {
         for (tr in doc.select("table.komik-series-table tr")) {
@@ -154,15 +160,12 @@ object MangaApi {
         val thumb = coverImg?.let { bestImgUrl(it) } ?: THUMB_FALLBACK
         val synopsis = doc.select("div.komik-series-hero__synopsis div.komik-series-entry p").text().trim()
             .ifEmpty { doc.select("div.komik-series-synopsis p").text().trim() }
-        val status = infoFromTable(doc, "Status")
-            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "" }
-            .ifEmpty { "Ongoing" }
-        val type = infoFromTable(doc, "Type")
-            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Type)")?.text()?.replace("Type:", "")?.trim() ?: "" }
-            .ifEmpty { "Manga" }
-        val author = infoFromTable(doc, "Author")
-            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Author)")?.text()?.replace("Author:", "")?.trim() ?: "" }
-            .ifEmpty { "-" }
+        val status = cleanInfo(infoFromTable(doc, "Status")
+            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "" }, "Ongoing")
+        val type = cleanInfo(infoFromTable(doc, "Type")
+            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Type)")?.text()?.replace("Type:", "")?.trim() ?: "" }, "Manga")
+        val author = cleanInfo(infoFromTable(doc, "Author")
+            .ifEmpty { doc.selectFirst("div.komik-series-meta:contains(Author)")?.text()?.replace("Author:", "")?.trim() ?: "" }, "-")
 
         val genres = doc.select("div.komik-series-taxonomy__terms a").map { it.text().trim() }
             .ifEmpty { doc.select("div.komik-series-genres a").map { it.text().trim() } }
