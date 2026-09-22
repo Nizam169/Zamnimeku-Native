@@ -1,5 +1,10 @@
 package com.zamnimeku.app.ui.components
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -19,15 +24,21 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import com.zamnimeku.app.data.api.UpdateApi
 import com.zamnimeku.app.data.model.AnimeCard
 import com.zamnimeku.app.data.model.MangaCard
 import com.zamnimeku.app.ui.theme.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import java.io.File
 
 // 5 Menu Tetap Wibuku (Random dihapus sesuai permintaan)
 enum class NavTab(val title: String, val icon: ImageVector) {
@@ -419,16 +430,103 @@ fun QualitySelectionDialog(
     )
 }
 
+sealed interface UpdateDlState {
+    data object Idle : UpdateDlState
+    data class Downloading(val done: Long, val total: Long) : UpdateDlState
+    data class Done(val file: File) : UpdateDlState
+    data class Error(val msg: String) : UpdateDlState
+}
+
+private fun formatMB(bytes: Long): String {
+    if (bytes <= 0) return "0 MB"
+    val mb = bytes / 1024f / 1024f
+    return if (mb >= 10) "${mb.toInt()} MB" else String.format("%.1f MB", mb)
+}
+
 @Composable
 fun UpdateDialog(
     currentVersion: String,
     newVersion: String,
     notes: String,
-    onDownload: () -> Unit,
+    tag: String,
+    apkUrl: String,
     onLater: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var dl by remember { mutableStateOf<UpdateDlState>(UpdateDlState.Idle) }
+    var job by remember { mutableStateOf<Job?>(null) }
+
+    fun destFile(): File {
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.cacheDir
+        if (!dir.exists()) dir.mkdirs()
+        val safeTag = tag.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        return File(dir, "Zamnimeku-$safeTag.apk")
+    }
+
+    fun startDownload() {
+        if (job?.isActive == true) return
+        val dest = destFile()
+        // Lanjutkan file setengah jalan kalau ada
+        job = scope.launch {
+            dl = UpdateDlState.Downloading(dest.length(), -1L)
+            val ok = UpdateApi.downloadApk(apkUrl, dest) { done, total ->
+                dl = UpdateDlState.Downloading(done, total)
+            }
+            if (ok && dest.length() > 1024 * 1024) {
+                dl = UpdateDlState.Done(dest)
+            } else {
+                if (dest.exists() && dest.length() <= 1024 * 1024) dest.delete()
+                dl = UpdateDlState.Error("Download gagal. Cek koneksi lalu coba lagi.")
+            }
+        }
+    }
+
+    fun cancelDownload() {
+        job?.cancel()
+        job = null
+        (dl as? UpdateDlState.Downloading)?.let { destFile().delete() }
+        dl = UpdateDlState.Idle
+    }
+
+    fun openViaBrowser() {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
+        } catch (_: Exception) {}
+    }
+
+    fun doInstall(file: File) {
+        try {
+            // Android 8+: harus diizinkan install dari sumber tak dikenal dulu
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                !context.packageManager.canRequestPackageInstalls()
+            ) {
+                val settings = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${context.packageName}")
+                )
+                context.startActivity(settings)
+                return
+            }
+            val uri = FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", file
+            )
+            val install = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(install)
+        } catch (_: Exception) {
+            openViaBrowser()
+        }
+    }
+
     AlertDialog(
-        onDismissRequest = onLater,
+        onDismissRequest = {
+            if ((dl as? UpdateDlState.Downloading) != null) cancelDownload()
+            onLater()
+        },
         containerColor = WibukuSurface,
         shape = RoundedCornerShape(16.dp),
         title = {
@@ -453,22 +551,122 @@ fun UpdateDialog(
                     fontSize = 12.sp,
                     lineHeight = 17.sp
                 )
+
+                // ── TIMELINE DOWNLOAD ──
+                when (val state = dl) {
+                    is UpdateDlState.Downloading -> {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        val frac = if (state.total > 0) {
+                            (state.done.toFloat() / state.total.toFloat()).coerceIn(0f, 1f)
+                        } else null
+                        if (frac != null) {
+                            LinearProgressIndicator(
+                                progress = { frac },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = WibukuPrimary,
+                                trackColor = WibukuBorder
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = WibukuPrimary,
+                                trackColor = WibukuBorder
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (state.total > 0) {
+                                val pct = ((state.done * 100) / state.total).toInt().coerceIn(0, 100)
+                                "${formatMB(state.done)} / ${formatMB(state.total)} • $pct%"
+                            } else {
+                                "${formatMB(state.done)} terdownload..."
+                            },
+                            color = WibukuText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    is UpdateDlState.Done -> {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Download selesai (${formatMB(state.file.length())}). Install untuk mengganti versi lama.",
+                            color = Color(0xFF10B981),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    is UpdateDlState.Error -> {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = state.msg,
+                            color = Color(0xFFE74C3C),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    else -> {}
+                }
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDownload,
-                colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(imageVector = Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Download Update", fontWeight = FontWeight.Bold)
+            when (val state = dl) {
+                is UpdateDlState.Downloading -> {
+                    TextButton(onClick = { cancelDownload() }) {
+                        Text(text = "Batal", color = Color(0xFFE74C3C), fontWeight = FontWeight.Bold)
+                    }
+                }
+                is UpdateDlState.Done -> {
+                    Button(
+                        onClick = { doInstall(state.file) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Install Sekarang", fontWeight = FontWeight.Bold)
+                    }
+                }
+                is UpdateDlState.Error -> {
+                    Button(
+                        onClick = { startDownload() },
+                        colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(text = "Coba Lagi", fontWeight = FontWeight.Bold)
+                    }
+                }
+                else -> {
+                    Button(
+                        onClick = { startDownload() },
+                        colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Download Update", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onLater) {
-                Text(text = "Nanti", color = WibukuMuted, fontWeight = FontWeight.Bold)
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = {
+                    if ((dl as? UpdateDlState.Downloading) != null) cancelDownload()
+                    onLater()
+                }) {
+                    Text(text = "Nanti", color = WibukuMuted, fontWeight = FontWeight.Bold)
+                }
+                if (dl is UpdateDlState.Error || dl is UpdateDlState.Done) {
+                    TextButton(onClick = { openViaBrowser() }) {
+                        Text(text = "Via Browser", color = WibukuPrimary, fontSize = 12.sp)
+                    }
+                }
             }
         }
     )

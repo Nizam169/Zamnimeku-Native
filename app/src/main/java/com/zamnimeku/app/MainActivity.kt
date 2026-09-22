@@ -1,7 +1,5 @@
 package com.zamnimeku.app
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -78,12 +76,8 @@ fun MainApp() {
             currentVersion = BuildConfig.VERSION_NAME,
             newVersion = info.versionName,
             notes = info.notes,
-            onDownload = {
-                try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl)))
-                } catch (_: Exception) {}
-                updateInfo = null
-            },
+            tag = info.tag,
+            apkUrl = info.apkUrl,
             onLater = {
                 prefs.skippedUpdateTag = info.tag
                 updateInfo = null

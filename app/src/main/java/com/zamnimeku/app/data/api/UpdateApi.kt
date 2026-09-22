@@ -1,10 +1,12 @@
 package com.zamnimeku.app.data.api
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 data class UpdateInfo(
@@ -67,6 +69,45 @@ object UpdateApi {
             )
         } catch (_: Exception) {
             null
+        }
+    }
+
+    // Download APK dengan progress callback (doneBytes, totalBytes).
+    // totalBytes = -1 kalau server tidak mengirim Content-Length.
+    suspend fun downloadApk(
+        url: String,
+        dest: File,
+        onProgress: (done: Long, total: Long) -> Unit
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Zamnimeku-App")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext false
+                val body = response.body ?: return@withContext false
+                val total = body.contentLength()
+                body.byteStream().use { input ->
+                    dest.outputStream().use { output ->
+                        val buf = ByteArray(32 * 1024)
+                        var done = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n == -1) break
+                            output.write(buf, 0, n)
+                            done += n
+                            withContext(Dispatchers.Main) { onProgress(done, total) }
+                        }
+                        output.flush()
+                    }
+                }
+                return@withContext true
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
         }
     }
 }
