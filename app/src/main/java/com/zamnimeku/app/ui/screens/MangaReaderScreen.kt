@@ -1,5 +1,7 @@
 package com.zamnimeku.app.ui.screens
 
+import android.app.Activity
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -42,6 +44,7 @@ fun MangaReaderScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     var images by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -68,6 +71,14 @@ fun MangaReaderScreen(
     val listState = rememberLazyListState()
     val firstVisibleItemIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
     val pagerState = rememberPagerState(pageCount = { images.size })
+
+    // Layar jangan mati/kunci sendiri selama baca komik
+    DisposableEffect(Unit) {
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     // Nomor halaman yang tampil di pill bawah
     val displayIndex = if (pagerMode) {
         if (images.isNotEmpty()) pagerState.currentPage else 0
