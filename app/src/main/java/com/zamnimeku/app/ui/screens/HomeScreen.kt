@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,7 +35,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onAnimeClick: (String, String, String) -> Unit,
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    onCheckUpdate: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -170,6 +172,16 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = WibukuMuted,
                                 fontSize = 12.sp
+                            )
+                        }
+
+                        // Tombol cek pembaruan manual
+                        IconButton(onClick = onCheckUpdate) {
+                            Icon(
+                                imageVector = Icons.Rounded.SystemUpdate,
+                                contentDescription = "Cek Pembaruan",
+                                tint = WibukuMuted,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }

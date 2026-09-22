@@ -1,6 +1,7 @@
 package com.zamnimeku.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -22,6 +23,7 @@ import com.zamnimeku.app.ui.components.NavTab
 import com.zamnimeku.app.ui.components.UpdateDialog
 import com.zamnimeku.app.ui.screens.*
 import com.zamnimeku.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 sealed class Screen {
     object Main : Screen()
@@ -57,17 +59,44 @@ fun MainApp() {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
     val screenStack = remember { mutableStateListOf<Screen>() }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var checkingUpdate by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun runUpdateCheck(manual: Boolean) {
+        if (checkingUpdate) return
+        checkingUpdate = true
+        scope.launch {
+            try {
+                val info = UpdateApi.checkUpdate()
+                val installed = BuildConfig.VERSION_CODE
+                when {
+                    info == null -> {
+                        if (manual) Toast.makeText(context, "Gagal cek update. Coba lagi.", Toast.LENGTH_SHORT).show()
+                    }
+                    info.versionCode > installed && info.tag != prefs.skippedUpdateTag -> {
+                        updateInfo = info
+                    }
+                    manual -> {
+                        // Reset skip supaya versi ini tetap bisa muncul lagi lain waktu
+                        Toast.makeText(
+                            context,
+                            "Sudah versi terbaru (v${BuildConfig.VERSION_NAME}).",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (_: Exception) {
+                if (manual) Toast.makeText(context, "Gagal cek update. Coba lagi.", Toast.LENGTH_SHORT).show()
+            } finally {
+                checkingUpdate = false
+            }
+        }
+    }
 
     // Cek auto-update sekali tiap buka app: bandingkan versi terpasang
     // dengan release terbaru di GitHub.
     LaunchedEffect(Unit) {
-        try {
-            val info = UpdateApi.checkUpdate()
-            val installed = BuildConfig.VERSION_CODE
-            if (info != null && info.versionCode > installed && info.tag != prefs.skippedUpdateTag) {
-                updateInfo = info
-            }
-        } catch (_: Exception) {}
+        runUpdateCheck(manual = false)
     }
 
     if (updateInfo != null) {
@@ -125,7 +154,8 @@ fun MainApp() {
                             onAnimeClick = { slug, title, thumb ->
                                 navigateTo(Screen.AnimeDetail(slug, title, thumb))
                             },
-                            onSearchClick = {}
+                            onSearchClick = {},
+                            onCheckUpdate = { runUpdateCheck(manual = true) }
                         )
                         NavTab.GENRE -> GenreScreen(
                             onAnimeClick = { slug, title, thumb ->
