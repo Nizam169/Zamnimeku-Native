@@ -1,5 +1,7 @@
 package com.zamnimeku.app
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -9,12 +11,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.api.UpdateApi
+import com.zamnimeku.app.data.api.UpdateInfo
 import com.zamnimeku.app.data.model.Episode
+import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.components.AppBottomBar
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.components.NavTab
+import com.zamnimeku.app.ui.components.UpdateDialog
 import com.zamnimeku.app.ui.screens.*
 import com.zamnimeku.app.ui.theme.*
 
@@ -46,9 +53,43 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainApp() {
+    val context = LocalContext.current
+    val prefs = remember { AppPreferences(context) }
     var currentTab by remember { mutableStateOf(NavTab.HOME) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
     val screenStack = remember { mutableStateListOf<Screen>() }
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+
+    // Cek auto-update sekali tiap buka app: bandingkan versi terpasang
+    // dengan release terbaru di GitHub.
+    LaunchedEffect(Unit) {
+        try {
+            val info = UpdateApi.checkUpdate()
+            val installed = BuildConfig.VERSION_CODE
+            if (info != null && info.versionCode > installed && info.tag != prefs.skippedUpdateTag) {
+                updateInfo = info
+            }
+        } catch (_: Exception) {}
+    }
+
+    if (updateInfo != null) {
+        val info = updateInfo!!
+        UpdateDialog(
+            currentVersion = BuildConfig.VERSION_NAME,
+            newVersion = info.versionName,
+            notes = info.notes,
+            onDownload = {
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl)))
+                } catch (_: Exception) {}
+                updateInfo = null
+            },
+            onLater = {
+                prefs.skippedUpdateTag = info.tag
+                updateInfo = null
+            }
+        )
+    }
 
     fun navigateTo(screen: Screen) {
         screenStack.add(currentScreen)

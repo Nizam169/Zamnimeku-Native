@@ -29,7 +29,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK with Gradle
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew assembleRelease -PappVersionCode=${{ github.run_number }} -PappVersionName=1.0.0.${{ github.run_number }} --stacktrace
 
       - name: Rename APK
         run: |

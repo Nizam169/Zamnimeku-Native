@@ -12,11 +12,17 @@ class AppPreferences(context: Context) {
     companion object {
         private const val KEY_PREFERRED_QUALITY = "preferred_quality"
         private const val KEY_WATCHED_ANIMES = "watched_animes_json"
+        private const val KEY_SKIPPED_UPDATE_TAG = "skipped_update_tag"
     }
 
     var preferredQuality: String
         get() = prefs.getString(KEY_PREFERRED_QUALITY, "360p") ?: "360p"
         set(value) = prefs.edit().putString(KEY_PREFERRED_QUALITY, value).apply()
+
+    // Tag release yang user pilih "Nanti" — jangan tawarkan lagi tag yang sama
+    var skippedUpdateTag: String
+        get() = prefs.getString(KEY_SKIPPED_UPDATE_TAG, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_SKIPPED_UPDATE_TAG, value).apply()
 
     // ── PROGRESS PER EPISODE (TIMELINE BAR) ──
     fun saveEpisodeProgress(epSlug: String, positionMs: Long, durationMs: Long) {

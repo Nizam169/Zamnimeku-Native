@@ -235,7 +235,9 @@ class ScheduleViewModel : ViewModel() {
                     val thumb = thumbCache[item.slug] ?: ""
                     val score = scoreCache[item.slug] ?: "-"
                     val total = totalEpCache[item.slug] ?: ""
-                    val epText = if (total.isNotEmpty() && total != "?" && total != "-") {
+                    val validTotal = total.isNotEmpty() && total != "?" && total != "-" &&
+                        !total.equals("Unknown", ignoreCase = true)
+                    val epText = if (validTotal) {
                         "Total $total Ep • Setiap $dayName"
                     } else {
                         item.episode

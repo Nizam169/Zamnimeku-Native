@@ -418,3 +418,58 @@ fun QualitySelectionDialog(
         confirmButton = {}
     )
 }
+
+@Composable
+fun UpdateDialog(
+    currentVersion: String,
+    newVersion: String,
+    notes: String,
+    onDownload: () -> Unit,
+    onLater: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onLater,
+        containerColor = WibukuSurface,
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.SystemUpdate, contentDescription = null, tint = WibukuPrimary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Versi Baru Tersedia", color = WibukuText, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "v$currentVersion → v$newVersion",
+                    color = WibukuPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (notes.isNotBlank()) notes.take(400) else "Ada update baru. Download dan install untuk dapat perbaikan terbaru.",
+                    color = WibukuMuted,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDownload,
+                colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(imageVector = Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = "Download Update", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onLater) {
+                Text(text = "Nanti", color = WibukuMuted, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}

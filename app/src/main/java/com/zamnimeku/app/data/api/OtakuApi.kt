@@ -234,7 +234,7 @@ object OtakuApi {
         val producer = doc.selectFirst("div.infozingle p:contains(Produser)")?.text()?.replace("Produser:", "")?.trim() ?: "-"
         val type = doc.selectFirst("div.infozingle p:contains(Tipe)")?.text()?.replace("Tipe:", "")?.trim() ?: "Anime"
         val status = doc.selectFirst("div.infozingle p:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "Ongoing"
-        val totalEp = doc.selectFirst("div.infozingle p:contains(Total Episode)")?.text()?.replace("Total Episode:", "")?.trim() ?: "?"
+        val rawTotalEp = doc.selectFirst("div.infozingle p:contains(Total Episode)")?.text()?.replace("Total Episode:", "")?.trim() ?: "?"
         val duration = doc.selectFirst("div.infozingle p:contains(Durasi)")?.text()?.replace("Durasi:", "")?.trim() ?: "24 min"
         val releaseDate = doc.selectFirst("div.infozingle p:contains(Tanggal Rilis)")?.text()?.replace("Tanggal Rilis:", "")?.trim() ?: "-"
         val studio = doc.selectFirst("div.infozingle p:contains(Studio)")?.text()?.replace("Studio:", "")?.trim() ?: "-"
@@ -258,6 +258,14 @@ object OtakuApi {
                     )
                 )
             }
+        }
+
+        // Situs menulis "Unknown" untuk ongoing — ganti dengan jumlah
+        // episode yang sudah rilis supaya tidak tampil unknown.
+        val totalEp = when {
+            rawTotalEp.isBlank() || rawTotalEp == "?" || rawTotalEp.equals("Unknown", ignoreCase = true) ->
+                if (episodes.isNotEmpty()) episodes.size.toString() else rawTotalEp.ifEmpty { "?" }
+            else -> rawTotalEp
         }
 
         AnimeDetail(
