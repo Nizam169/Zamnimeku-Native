@@ -70,6 +70,11 @@ jobs:
           tag_name: v1.0.0-${{ github.run_number }}
           name: Zamnimeku Native v1.0.0 (Release #${{ github.run_number }})
           body: |
+            ### 📲 Cara install
+            1. Download file **`Zamnimeku-Native-v1.0.0.apk`** (±16 MB) di bawah ini — **JANGAN** yang "Source code".
+            2. Kalau update dari versi sangat lama dan muncul "bentrok paket", uninstall dulu sekali saja.
+            3. Buka file APK → izinkan "install dari sumber tak dikenal" → Install.
+
             ### 🚀 Zamnimeku Native Android Release
             - Built with **Kotlin + Jetpack Compose + Material3 + Media3 ExoPlayer**
             - Support resolutions: **360p, 480p, 720p, 1080p**
