@@ -31,6 +31,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -147,7 +150,12 @@ fun PlayerScreen(
             exoPlayer.removeListener(listener)
             exoPlayer.release()
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.let { act ->
+                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                // Pastikan status/nav bar balik normal kalau keluar pas landscape
+                val controller = WindowCompat.getInsetsController(act.window, act.window.decorView)
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -246,6 +254,24 @@ fun PlayerScreen(
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             isLandscape = true
         }
+    }
+
+    // Fullscreen beneran di landscape: status bar + nav bar disembunyikan,
+    // muncul lagi dengan swipe, dan dikembalikan pas portrait/keluar.
+    fun applyFullscreen(fullscreen: Boolean) {
+        val w = activity?.window ?: return
+        val controller = WindowCompat.getInsetsController(w, w.decorView)
+        if (fullscreen) {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    LaunchedEffect(isLandscape) {
+        applyFullscreen(isLandscape)
     }
 
     BackHandler {
