@@ -37,8 +37,19 @@ jobs:
         run: |
           APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
           echo "APK: $APK"
-          unzip -p "$APK" 'META-INF/*.RSA' > /tmp/sig.RSA 2>/dev/null || unzip -p "$APK" 'META-INF/*.DSA' > /tmp/sig.RSA
-          keytool -printcert -file /tmp/sig.RSA | grep -E "Owner|SHA256" || true
+          SIG=$(unzip -Z1 "$APK" | grep -i -m1 "META-INF/.*\.\(RSA\|DSA\|EC\)$" || true)
+          echo "SIG block: $SIG"
+          if [ -n "$SIG" ]; then
+            unzip -p "$APK" "$SIG" > /tmp/sig.block
+            keytool -printcert -file /tmp/sig.block | grep -E "Owner|SHA256" || true
+          else
+            echo "No v1 signature block (v2+ only), checking with apksigner..."
+            APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | head -n 1 || true)
+            if [ -n "$APKSIGNER" ]; then
+              "$APKSIGNER" verify --print-certs "$APK" 2>&1 | grep -iE "certificate|sha-256" | head -n 6 || true
+            fi
+          fi
+          echo "verify done"
 
       - name: Rename APK
         run: |
