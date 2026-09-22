@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+import java.util.Properties
+
 android {
     namespace = "com.zamnimeku.app"
     compileSdk = 35
@@ -27,7 +29,7 @@ android {
     // (update bisa menimpa tanpa "bentrok paket").
     // Password dibaca dari keystore.properties (lokal, jangan commit)
     // atau env KEYSTORE_PASSWORD (diisi GitHub Secrets saat CI).
-    val ksProps = java.util.Properties()
+    val ksProps = Properties()
     val ksPropsFile = rootProject.file("keystore.properties")
     if (ksPropsFile.exists()) ksPropsFile.inputStream().use { ksProps.load(it) }
     val ksPassword: String? =
