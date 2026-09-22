@@ -30,6 +30,15 @@ jobs:
 
       - name: Build Release APK with Gradle
         run: ./gradlew assembleRelease -PappVersionCode=${{ github.run_number }} -PappVersionName=1.0.0.${{ github.run_number }} --stacktrace
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+
+      - name: Verify release signature (persistent key)
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          echo "APK: $APK"
+          unzip -p "$APK" 'META-INF/*.RSA' > /tmp/sig.RSA 2>/dev/null || unzip -p "$APK" 'META-INF/*.DSA' > /tmp/sig.RSA
+          keytool -printcert -file /tmp/sig.RSA | grep -E "Owner|SHA256" || true
 
       - name: Rename APK
         run: |

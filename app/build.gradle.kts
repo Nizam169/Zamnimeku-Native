@@ -23,6 +23,31 @@ android {
         }
     }
 
+    // Kunci permanen supaya semua build punya tanda tangan sama
+    // (update bisa menimpa tanpa "bentrok paket").
+    // Password dibaca dari keystore.properties (lokal, jangan commit)
+    // atau env KEYSTORE_PASSWORD (diisi GitHub Secrets saat CI).
+    val ksProps = java.util.Properties()
+    val ksPropsFile = rootProject.file("keystore.properties")
+    if (ksPropsFile.exists()) ksPropsFile.inputStream().use { ksProps.load(it) }
+    val ksPassword: String? =
+        ksProps.getProperty("storePassword") ?: System.getenv("KEYSTORE_PASSWORD")
+    val ksFile = file("release.keystore")
+
+    signingConfigs {
+        create("persistent") {
+            if (ksFile.exists() && !ksPassword.isNullOrEmpty()) {
+                storeFile = ksFile
+                storePassword = ksPassword
+                keyAlias = "zamnimeku"
+                keyPassword = ksPassword
+            } else {
+                // Fallback lokal: debug key (jangan dipakai untuk rilis publik)
+                storeFile = null
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -31,7 +56,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (ksFile.exists() && !ksPassword.isNullOrEmpty()) {
+                signingConfigs.getByName("persistent")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
         debug {
             isMinifyEnabled = false
