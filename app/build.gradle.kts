@@ -43,6 +43,9 @@ android {
                 storePassword = ksPassword
                 keyAlias = "zamnimeku"
                 keyPassword = ksPassword
+                // Aktifkan eksplisit v1+v2 untuk kompatibilitas installer maksimal
+                enableV1Signing = true
+                enableV2Signing = true
             } else {
                 // Fallback lokal: debug key (jangan dipakai untuk rilis publik)
                 storeFile = null

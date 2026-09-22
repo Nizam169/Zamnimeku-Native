@@ -74,6 +74,8 @@ object UpdateApi {
 
     // Download APK dengan progress callback (doneBytes, totalBytes).
     // totalBytes = -1 kalau server tidak mengirim Content-Length.
+    // Berhasil HANYA jika ukuran file persis sama dengan Content-Length
+    // (mencegah file kepotong yang bikin "paket tidak valid" saat install).
     suspend fun downloadApk(
         url: String,
         dest: File,
@@ -101,6 +103,15 @@ object UpdateApi {
                         }
                         output.flush()
                     }
+                }
+                // Tolak file tidak lengkap
+                if (total > 0 && dest.length() != total) {
+                    dest.delete()
+                    return@withContext false
+                }
+                if (dest.length() <= 1024 * 1024) {
+                    dest.delete()
+                    return@withContext false
                 }
                 return@withContext true
             }
