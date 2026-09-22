@@ -7,6 +7,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import com.zamnimeku.app.data.notify.UpdateNotifier
 
 class ZamnimekuApp : Application(), ImageLoaderFactory {
 
@@ -18,6 +19,7 @@ class ZamnimekuApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        UpdateNotifier.ensureChannel(this)
     }
 
     override fun newImageLoader(): ImageLoader {

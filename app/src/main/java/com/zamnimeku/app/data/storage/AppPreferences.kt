@@ -13,6 +13,7 @@ class AppPreferences(context: Context) {
         private const val KEY_PREFERRED_QUALITY = "preferred_quality"
         private const val KEY_WATCHED_ANIMES = "watched_animes_json"
         private const val KEY_SKIPPED_UPDATE_TAG = "skipped_update_tag"
+        private const val KEY_NOTIFIED_UPDATE_TAG = "notified_update_tag"
     }
 
     var preferredQuality: String
@@ -23,6 +24,11 @@ class AppPreferences(context: Context) {
     var skippedUpdateTag: String
         get() = prefs.getString(KEY_SKIPPED_UPDATE_TAG, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SKIPPED_UPDATE_TAG, value).apply()
+
+    // Tag release yang sudah dikirim notifikasinya — notif sekali per versi
+    var notifiedUpdateTag: String
+        get() = prefs.getString(KEY_NOTIFIED_UPDATE_TAG, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_NOTIFIED_UPDATE_TAG, value).apply()
 
     // ── PROGRESS PER EPISODE (TIMELINE BAR) ──
     fun saveEpisodeProgress(epSlug: String, positionMs: Long, durationMs: Long) {

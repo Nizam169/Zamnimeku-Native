@@ -451,6 +451,40 @@ private fun formatMB(bytes: Long): String {
     return if (mb >= 10) "${mb.toInt()} MB" else String.format("%.1f MB", mb)
 }
 
+// Rapikan catatan rilis GitHub (markdown) jadi teks polos yang enak dibaca
+// di dialog: buang heading/bold/code, ubah "- " jadi "• ",
+// dan buang seksi "Cara install" (dialog sudah punya alurnya sendiri).
+fun formatReleaseNotes(raw: String): String {
+    if (raw.isBlank()) return "Ada update baru. Download dan install untuk dapat perbaikan terbaru."
+    val out = mutableListOf<String>()
+    var skipInstall = false
+    for (rawLine in raw.lines()) {
+        var s = rawLine.trim()
+        s = s.replace(Regex("^#{1,6}\\s*"), "")
+        s = s.replace("**", "").replace("`", "")
+        if (s.isEmpty()) continue
+        if (s.contains("cara install", ignoreCase = true)) {
+            skipInstall = true
+            continue
+        }
+        if (skipInstall) {
+            // Akhir seksi install: header baru / bullet fitur
+            if (s.startsWith("• ") || s.contains("Zamnimeku Native", ignoreCase = true)) {
+                skipInstall = false
+            } else {
+                continue
+            }
+        }
+        s = s.replace(Regex("^-\\s+"), "• ")
+        s = s.replace(Regex("^\\d+\\.\\s+"), "• ")
+        if (!s.startsWith("• ")) s = "• $s"
+        out.add(s)
+        if (out.size >= 6) break
+    }
+    if (out.isEmpty()) return "Ada update baru. Download dan install untuk dapat perbaikan terbaru."
+    return out.joinToString("\n").take(350)
+}
+
 @Composable
 fun UpdateDialog(
     currentVersion: String,
@@ -554,10 +588,10 @@ fun UpdateDialog(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = if (notes.isNotBlank()) notes.take(400) else "Ada update baru. Download dan install untuk dapat perbaikan terbaru.",
+                    text = formatReleaseNotes(notes),
                     color = WibukuMuted,
                     fontSize = 12.sp,
-                    lineHeight = 17.sp
+                    lineHeight = 18.sp
                 )
 
                 // ── TIMELINE DOWNLOAD ──

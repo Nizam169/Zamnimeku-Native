@@ -3,6 +3,8 @@ package com.zamnimeku.app
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -16,6 +18,7 @@ import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.data.api.UpdateApi
 import com.zamnimeku.app.data.api.UpdateInfo
 import com.zamnimeku.app.data.model.Episode
+import com.zamnimeku.app.data.notify.UpdateNotifier
 import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.components.AppBottomBar
 import com.zamnimeku.app.ui.components.LoadingView
@@ -62,6 +65,17 @@ fun MainApp() {
     var checkingUpdate by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    // Izin notifikasi (Android 13+) supaya update baru bisa masuk status-bar
+    val notifPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
+    fun notifyUpdate(info: UpdateInfo) {
+        if (prefs.notifiedUpdateTag == info.tag) return
+        prefs.notifiedUpdateTag = info.tag
+        UpdateNotifier.showUpdateAvailable(context, info)
+    }
+
     fun runUpdateCheck(manual: Boolean) {
         if (checkingUpdate) return
         checkingUpdate = true
@@ -75,6 +89,7 @@ fun MainApp() {
                     }
                     info.versionCode > installed && info.tag != prefs.skippedUpdateTag -> {
                         updateInfo = info
+                        notifyUpdate(info)
                     }
                     manual -> {
                         // Reset skip supaya versi ini tetap bisa muncul lagi lain waktu
@@ -96,6 +111,16 @@ fun MainApp() {
     // Cek auto-update sekali tiap buka app: bandingkan versi terpasang
     // dengan release terbaru di GitHub.
     LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                try {
+                    notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                } catch (_: Exception) {}
+            }
+        }
         runUpdateCheck(manual = false)
     }
 
