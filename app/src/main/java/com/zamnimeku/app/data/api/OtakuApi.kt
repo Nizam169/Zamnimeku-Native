@@ -44,6 +44,13 @@ object OtakuApi {
         return clean.substringAfterLast('/')
     }
 
+    // Situs menulis "Unknown"/"?" untuk data kosong (episode, rating, dst).
+    // Ubah jadi string kosong supaya UI tidak menampilkan unknown.
+    private fun cleanField(s: String): String {
+        val t = s.trim()
+        return if (t.isEmpty() || t == "?" || t.equals("Unknown", ignoreCase = true)) "" else t
+    }
+
     suspend fun getOngoingAnime(page: Int = 1): List<AnimeCard> = withContext(Dispatchers.IO) {
         val path = if (page == 1) "$BASE_URL/ongoing-anime/" else "$BASE_URL/ongoing-anime/page/$page/"
         val html = getHtml(path)
@@ -57,9 +64,9 @@ object OtakuApi {
             val link = item.selectFirst("a[href*=/anime/]")?.attr("href") ?: continue
             val title = item.selectFirst("h2.jdlflm")?.text()?.trim() ?: continue
             val thumb = item.selectFirst("img")?.attr("src") ?: ""
-            val ep = item.selectFirst("div.epz")?.text()?.trim() ?: ""
-            val day = item.selectFirst("div.epztipe")?.text()?.trim() ?: ""
-            val date = item.selectFirst("div.newnime")?.text()?.trim() ?: ""
+            val ep = cleanField(item.selectFirst("div.epz")?.text() ?: "")
+            val day = cleanField(item.selectFirst("div.epztipe")?.text() ?: "")
+            val date = cleanField(item.selectFirst("div.newnime")?.text() ?: "")
 
             result.add(
                 AnimeCard(
@@ -89,9 +96,9 @@ object OtakuApi {
             val link = item.selectFirst("a[href*=/anime/]")?.attr("href") ?: continue
             val title = item.selectFirst("h2.jdlflm")?.text()?.trim() ?: continue
             val thumb = item.selectFirst("img")?.attr("src") ?: ""
-            val ep = item.selectFirst("div.epz")?.text()?.trim() ?: ""
-            val score = item.selectFirst("div.epztipe")?.text()?.trim() ?: ""
-            val date = item.selectFirst("div.newnime")?.text()?.trim() ?: ""
+            val ep = cleanField(item.selectFirst("div.epz")?.text() ?: "")
+            val score = cleanField(item.selectFirst("div.epztipe")?.text() ?: "")
+            val date = cleanField(item.selectFirst("div.newnime")?.text() ?: "")
 
             result.add(
                 AnimeCard(
@@ -121,8 +128,8 @@ object OtakuApi {
             val link = item.selectFirst("h2 a")?.attr("href") ?: continue
             val title = item.selectFirst("h2 a")?.text()?.trim() ?: continue
             val thumb = item.selectFirst("img")?.attr("src") ?: ""
-            val status = item.selectFirst("div.set:contains(Status)")?.text()?.replace("Status :", "")?.trim() ?: ""
-            val score = item.selectFirst("div.set:contains(Rating)")?.text()?.replace("Rating :", "")?.trim() ?: ""
+            val status = cleanField(item.selectFirst("div.set:contains(Status)")?.text()?.replace("Status :", "") ?: "")
+            val score = cleanField(item.selectFirst("div.set:contains(Rating)")?.text()?.replace("Rating :", "") ?: "")
 
             result.add(
                 AnimeCard(
@@ -169,8 +176,8 @@ object OtakuApi {
             val link = item.selectFirst("div.col-anime-title a")?.attr("href") ?: continue
             val title = item.selectFirst("div.col-anime-title a")?.text()?.trim() ?: continue
             val thumb = item.selectFirst("div.col-anime-cover img")?.attr("src") ?: ""
-            val ep = item.selectFirst("div.col-anime-eps")?.text()?.trim() ?: ""
-            val score = item.selectFirst("div.col-anime-rating")?.text()?.trim() ?: ""
+            val ep = cleanField(item.selectFirst("div.col-anime-eps")?.text() ?: "")
+            val score = cleanField(item.selectFirst("div.col-anime-rating")?.text() ?: "")
 
             result.add(
                 AnimeCard(
@@ -230,7 +237,7 @@ object OtakuApi {
             ?: doc.selectFirst("div.jdlarea h1")?.text()?.trim() ?: animeSlug
         val thumb = doc.selectFirst("div.fotoanime img")?.attr("src") ?: ""
         val synopsis = doc.select("div.sinopc p").text().trim()
-        val score = doc.selectFirst("div.infozingle p:contains(Skor)")?.text()?.replace("Skor:", "")?.trim() ?: "-"
+        val score = cleanField(doc.selectFirst("div.infozingle p:contains(Skor)")?.text()?.replace("Skor:", "") ?: "").ifEmpty { "-" }
         val producer = doc.selectFirst("div.infozingle p:contains(Produser)")?.text()?.replace("Produser:", "")?.trim() ?: "-"
         val type = doc.selectFirst("div.infozingle p:contains(Tipe)")?.text()?.replace("Tipe:", "")?.trim() ?: "Anime"
         val status = doc.selectFirst("div.infozingle p:contains(Status)")?.text()?.replace("Status:", "")?.trim() ?: "Ongoing"
