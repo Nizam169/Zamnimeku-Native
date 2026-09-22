@@ -44,11 +44,12 @@ object OtakuApi {
         return clean.substringAfterLast('/')
     }
 
-    // Situs menulis "Unknown"/"?" untuk data kosong (episode, rating, dst).
-    // Ubah jadi string kosong supaya UI tidak menampilkan unknown.
+    // Situs menulis "Unknown"/"?" untuk data kosong (episode, rating, dst),
+    // kadang dalam bentuk "Eps Unknown". Ubah jadi string kosong supaya
+    // UI tidak menampilkan unknown.
     private fun cleanField(s: String): String {
         val t = s.trim()
-        return if (t.isEmpty() || t == "?" || t.equals("Unknown", ignoreCase = true)) "" else t
+        return if (t.isEmpty() || t == "?" || t.contains("Unknown", ignoreCase = true)) "" else t
     }
 
     suspend fun getOngoingAnime(page: Int = 1): List<AnimeCard> = withContext(Dispatchers.IO) {
@@ -270,7 +271,7 @@ object OtakuApi {
         // Situs menulis "Unknown" untuk ongoing — ganti dengan jumlah
         // episode yang sudah rilis supaya tidak tampil unknown.
         val totalEp = when {
-            rawTotalEp.isBlank() || rawTotalEp == "?" || rawTotalEp.equals("Unknown", ignoreCase = true) ->
+            rawTotalEp.isBlank() || rawTotalEp == "?" || rawTotalEp.contains("Unknown", ignoreCase = true) ->
                 if (episodes.isNotEmpty()) episodes.size.toString() else rawTotalEp.ifEmpty { "?" }
             else -> rawTotalEp
         }

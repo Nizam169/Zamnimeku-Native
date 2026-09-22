@@ -602,12 +602,14 @@ fun AnimeScheduleCard(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Baris Ikon Mata + Views & Ikon Bintang + Rating
-                // (disembunyikan kalau datanya "-" biar gak bug tampil strip)
+                // (disembunyikan kalau datanya "-" atau mengandung unknown
+                // biar gak bug tampil strip/unknown)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (anime.views.isNotEmpty() && anime.views != "-") {
+                    if (anime.views.isNotEmpty() && anime.views != "-" &&
+                        !anime.views.contains("unknown", ignoreCase = true)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Rounded.Visibility,
@@ -625,7 +627,8 @@ fun AnimeScheduleCard(
                         }
                     }
 
-                    if (anime.rating.isNotEmpty() && anime.rating != "-") {
+                    if (anime.rating.isNotEmpty() && anime.rating != "-" &&
+                        !anime.rating.contains("unknown", ignoreCase = true)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Rounded.Star,

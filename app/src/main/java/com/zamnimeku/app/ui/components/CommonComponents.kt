@@ -133,6 +133,14 @@ fun AnimeCardView(
     anime: AnimeCard,
     onClick: () -> Unit
 ) {
+    // Pertahanan terakhir: teks berisi "unknown" (varian apa pun) tidak
+    // pernah ditampilkan sebagai badge.
+    fun shown(s: String): String =
+        if (s.contains("unknown", ignoreCase = true)) "" else s
+
+    val epBadge = shown(anime.episode)
+    val scoreBadge = shown(anime.score)
+    val dayBadge = shown(anime.day)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -168,7 +176,7 @@ fun AnimeCardView(
                 )
 
                 // Episode badge (Top Start)
-                if (anime.episode.isNotEmpty()) {
+                if (epBadge.isNotEmpty()) {
                     Surface(
                         modifier = Modifier
                             .padding(6.dp)
@@ -177,7 +185,7 @@ fun AnimeCardView(
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = anime.episode,
+                            text = epBadge,
                             color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -187,7 +195,7 @@ fun AnimeCardView(
                 }
 
                 // Score / Day badge (Bottom End)
-                val tag = if (anime.score.isNotEmpty()) "★ ${anime.score}" else anime.day
+                val tag = if (scoreBadge.isNotEmpty()) "★ $scoreBadge" else dayBadge
                 if (tag.isNotEmpty()) {
                     Surface(
                         modifier = Modifier
@@ -198,7 +206,7 @@ fun AnimeCardView(
                     ) {
                         Text(
                             text = tag,
-                            color = if (anime.score.isNotEmpty()) Color(0xFFFBBF24) else Color.White,
+                            color = if (scoreBadge.isNotEmpty()) Color(0xFFFBBF24) else Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
