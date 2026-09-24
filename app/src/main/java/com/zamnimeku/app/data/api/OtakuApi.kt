@@ -386,7 +386,7 @@ object OtakuApi {
             else -> value
         } ?: return null
         val url = resolved.toHttpUrlOrNull() ?: return null
-        return url.toString().takeIf { it.scheme == "http" || it.scheme == "https" }
+        return url.toString().takeIf { url.scheme == "http" || url.scheme == "https" }
     }
 
     private fun declaredQuality(rawQuality: String): String? {
