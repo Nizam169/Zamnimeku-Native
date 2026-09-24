@@ -487,6 +487,25 @@ object OtakuApi {
         }
     }
 
+    private suspend fun validateStreamUrl(url: String): Boolean {
+        return withTimeoutOrNull(7000) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Range", "bytes=0-0")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    val contentType = response.header("Content-Type").orEmpty().lowercase()
+                    (response.code == 200 || response.code == 206) &&
+                        !contentType.contains("text/html") &&
+                        !contentType.contains("application/json")
+                }
+            } catch (_: Exception) {
+                false
+            }
+        } ?: false
+    }
+
     private fun scoreStreamUrl(url: String): Int {
         val lowerUrl = url.lowercase()
         if (lowerUrl.contains("odcloud.net") || lowerUrl.contains("desustream.net") || lowerUrl.contains("desustream.me")) return 100
@@ -628,15 +647,23 @@ object OtakuApi {
         val availableQualities = QUALITY_ORDER.filter { qualityMap.containsKey(it) }.toMutableList()
         if (qualityMap.containsKey(AUTO_QUALITY)) availableQualities.add(AUTO_QUALITY)
 
-        return@withContext availableQualities.map { quality ->
-            val sortedCandidates = qualityMap.getValue(quality).sortedByDescending { scoreStreamUrl(it.url) }
-            VideoSource(
-                quality = quality,
-                server = sortedCandidates.first().server,
-                url = sortedCandidates.first().url,
-                backupUrls = sortedCandidates.drop(1).map { it.url },
-                backupServers = sortedCandidates.drop(1).map { it.server }
-            )
+        return@withContext coroutineScope {
+            availableQualities.map { quality ->
+                async(Dispatchers.IO) {
+                    val sortedCandidates = qualityMap.getValue(quality).sortedByDescending { scoreStreamUrl(it.url) }
+                    val validatedCandidates = sortedCandidates.map { candidate ->
+                        async(Dispatchers.IO) { candidate to validateStreamUrl(candidate.url) }
+                    }.awaitAll().filter { it.second }.map { it.first }
+                    val selectedCandidates = validatedCandidates.ifEmpty { sortedCandidates }
+                    VideoSource(
+                        quality = quality,
+                        server = selectedCandidates.first().server,
+                        url = selectedCandidates.first().url,
+                        backupUrls = selectedCandidates.drop(1).map { it.url },
+                        backupServers = selectedCandidates.drop(1).map { it.server }
+                    )
+                }
+            }.awaitAll()
         }
     }
 }
