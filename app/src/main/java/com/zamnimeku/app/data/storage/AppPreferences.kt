@@ -2,6 +2,7 @@ package com.zamnimeku.app.data.storage
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.data.model.HistoryItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,29 +32,41 @@ class AppPreferences(context: Context) {
         set(value) = prefs.edit().putString(KEY_NOTIFIED_UPDATE_TAG, value).apply()
 
     // ── PROGRESS PER EPISODE (TIMELINE BAR) ──
-    fun saveEpisodeProgress(epSlug: String, positionMs: Long, durationMs: Long) {
+    private fun episodeKey(epSlug: String, source: AnimeSource): String = "${source.name}:$epSlug"
+
+    fun saveEpisodeProgress(
+        epSlug: String,
+        positionMs: Long,
+        durationMs: Long,
+        source: AnimeSource = AnimeSource.OTAKUDESU
+    ) {
         if (durationMs <= 0) return
         val progress = (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+        val key = episodeKey(epSlug, source)
         prefs.edit()
-            .putFloat("watch_prog_$epSlug", progress)
-            .putLong("watch_pos_$epSlug", positionMs)
-            .putLong("watch_dur_$epSlug", durationMs)
+            .putFloat("watch_prog_$key", progress)
+            .putLong("watch_pos_$key", positionMs)
+            .putLong("watch_dur_$key", durationMs)
             .apply()
     }
 
-    fun getEpisodeProgress(epSlug: String): Float {
-        return prefs.getFloat("watch_prog_$epSlug", 0f)
+    fun getEpisodeProgress(epSlug: String, source: AnimeSource = AnimeSource.OTAKUDESU): Float {
+        val key = "watch_prog_${episodeKey(epSlug, source)}"
+        return if (prefs.contains(key)) prefs.getFloat(key, 0f) else prefs.getFloat("watch_prog_$epSlug", 0f)
     }
 
-    fun getEpisodePosition(epSlug: String): Long {
-        return prefs.getLong("watch_pos_$epSlug", 0L)
+    fun getEpisodePosition(epSlug: String, source: AnimeSource = AnimeSource.OTAKUDESU): Long {
+        val key = "watch_pos_${episodeKey(epSlug, source)}"
+        return if (prefs.contains(key)) prefs.getLong(key, 0L) else prefs.getLong("watch_pos_$epSlug", 0L)
     }
 
     // ── RIWAYAT ANIME UNIK ──
     fun saveHistory(item: HistoryItem) {
-        saveEpisodeProgress(item.lastEpSlug, item.positionMs, item.durationMs)
+        saveEpisodeProgress(item.lastEpSlug, item.positionMs, item.durationMs, item.source)
         val list = getHistory().toMutableList()
-        val existingIndex = list.indexOfFirst { it.animeSlug == item.animeSlug }
+        val existingIndex = list.indexOfFirst {
+            it.animeSlug == item.animeSlug && it.source == item.source
+        }
         if (existingIndex != -1) {
             list[existingIndex] = item
         } else {
@@ -74,6 +87,7 @@ class AppPreferences(context: Context) {
                 put("durationMs", h.durationMs)
                 put("progress", h.progress.toDouble())
                 put("updatedAt", h.updatedAt)
+                put("source", h.source.name)
             }
             arr.put(obj)
         }
@@ -98,7 +112,10 @@ class AppPreferences(context: Context) {
                         positionMs = obj.optLong("positionMs", 0L),
                         durationMs = obj.optLong("durationMs", 0L),
                         progress = obj.optDouble("progress", 0.0).toFloat(),
-                        updatedAt = obj.optLong("updatedAt", 0L)
+                        updatedAt = obj.optLong("updatedAt", 0L),
+                        source = runCatching {
+                            AnimeSource.valueOf(obj.optString("source"))
+                        }.getOrDefault(AnimeSource.MYNIMEKU)
                     )
                 )
             }
@@ -106,8 +123,8 @@ class AppPreferences(context: Context) {
         return list.sortedByDescending { it.updatedAt }
     }
 
-    fun deleteHistoryItem(animeSlug: String) {
-        val list = getHistory().filter { it.animeSlug != animeSlug }
+    fun deleteHistoryItem(animeSlug: String, source: AnimeSource = AnimeSource.OTAKUDESU) {
+        val list = getHistory().filter { it.animeSlug != animeSlug || it.source != source }
         val arr = JSONArray()
         for (h in list) {
             val obj = JSONObject().apply {
@@ -121,6 +138,7 @@ class AppPreferences(context: Context) {
                 put("durationMs", h.durationMs)
                 put("progress", h.progress.toDouble())
                 put("updatedAt", h.updatedAt)
+                put("source", h.source.name)
             }
             arr.put(obj)
         }

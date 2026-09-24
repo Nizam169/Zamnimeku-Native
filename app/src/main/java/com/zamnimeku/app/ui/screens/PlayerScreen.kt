@@ -45,6 +45,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.zamnimeku.app.data.api.AnimeApi
+import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.data.model.Episode
 import com.zamnimeku.app.data.model.HistoryItem
 import com.zamnimeku.app.data.model.VideoSource
@@ -64,6 +66,7 @@ fun PlayerScreen(
     animeTitle: String,
     animeSlug: String,
     animeThumb: String,
+    source: AnimeSource = AnimeSource.OTAKUDESU,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -98,11 +101,17 @@ fun PlayerScreen(
 
     // ExoPlayer dengan LoadControl Cepat (Instant Playback 250ms)
     val exoPlayer = remember {
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+        val httpDataSourceBuilder = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
             .setConnectTimeoutMs(15000)
             .setReadTimeoutMs(15000)
             .setAllowCrossProtocolRedirects(true)
+        if (source == AnimeSource.OTAKUDESU) {
+            httpDataSourceBuilder.setDefaultRequestProperties(
+                mapOf("Referer" to "${OtakuApi.BASE_URL}/")
+            )
+        }
+        val httpDataSourceFactory = httpDataSourceBuilder
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
@@ -156,15 +165,18 @@ fun PlayerScreen(
             currentUrl = url
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
-            val mediaItem = MediaItem.Builder()
+            val mediaItemBuilder = MediaItem.Builder()
                 .setUri(Uri.parse(url))
-                .setMimeType(MimeTypes.APPLICATION_MP4)
-                .build()
-            exoPlayer.setMediaItem(mediaItem)
+            if (source == AnimeSource.MYNIMEKU || url.contains(".mp4", ignoreCase = true)) {
+                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MP4)
+            } else if (url.contains(".m3u8", ignoreCase = true)) {
+                mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+            }
+            exoPlayer.setMediaItem(mediaItemBuilder.build())
             exoPlayer.prepare()
 
             val resumePos = resumeAt?.takeIf { it > 2000L }
-                ?: prefs.getEpisodePosition(currentEpisodeSlug).takeIf { it > 2000L }
+                ?: prefs.getEpisodePosition(currentEpisodeSlug, source).takeIf { it > 2000L }
             if (resumePos != null) {
                 exoPlayer.seekTo(resumePos)
             }
@@ -250,7 +262,8 @@ fun PlayerScreen(
                         positionMs = currentPositionMs,
                         durationMs = durationMs,
                         progress = prog,
-                        updatedAt = System.currentTimeMillis()
+                        updatedAt = System.currentTimeMillis(),
+                        source = source
                     )
                 )
             }
@@ -276,7 +289,11 @@ fun PlayerScreen(
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         try {
-            val sources = AnimeApi.getVideoCandidates(currentEp.slug)
+            val sources = if (source == AnimeSource.MYNIMEKU) {
+                AnimeApi.getVideoCandidates(currentEp.slug)
+            } else {
+                OtakuApi.getVideoCandidates(currentEp.slug)
+            }
             candidates = sources
             val target = selectVideoSource(sources, selectedQuality)
             if (target != null) {
@@ -712,7 +729,7 @@ fun PlayerScreen(
                 ) {
                     itemsIndexed(episodes) { index, ep ->
                         val isCurrent = index == currentEpIndex
-                        val epProg = prefs.getEpisodeProgress(ep.slug)
+                        val epProg = prefs.getEpisodeProgress(ep.slug, source)
                         val hasWatched = epProg > 0f
                         val isDone = epProg >= 0.9f
 

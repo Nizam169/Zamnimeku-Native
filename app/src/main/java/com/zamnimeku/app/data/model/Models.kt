@@ -1,5 +1,10 @@
 package com.zamnimeku.app.data.model
 
+enum class AnimeSource {
+    OTAKUDESU,
+    MYNIMEKU
+}
+
 data class AnimeCard(
     val title: String,
     val slug: String,
@@ -93,5 +98,6 @@ data class HistoryItem(
     val positionMs: Long,
     val durationMs: Long,
     val progress: Float,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val source: AnimeSource = AnimeSource.OTAKUDESU
 )

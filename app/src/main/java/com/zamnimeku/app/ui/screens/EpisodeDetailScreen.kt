@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.zamnimeku.app.data.api.AnimeApi
+import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.data.model.AnimeDetail
+import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
@@ -40,6 +42,7 @@ fun EpisodeDetailScreen(
     animeSlug: String,
     animeTitle: String,
     animeThumb: String,
+    source: AnimeSource = AnimeSource.OTAKUDESU,
     onBack: () -> Unit,
     onEpisodeClick: (Int, String) -> Unit
 ) {
@@ -51,13 +54,17 @@ fun EpisodeDetailScreen(
     var retryTrigger by remember { mutableStateOf(0) }
 
     val history = remember { prefs.getHistory() }
-    val lastWatched = history.firstOrNull { it.animeSlug == animeSlug }
+    val lastWatched = history.firstOrNull { it.animeSlug == animeSlug && it.source == source }
 
-    LaunchedEffect(animeSlug, retryTrigger) {
+    LaunchedEffect(animeSlug, source, retryTrigger) {
         isLoading = true
         errorMessage = null
         try {
-            val d = AnimeApi.getAnimeDetail(animeSlug)
+                val d = if (source == AnimeSource.MYNIMEKU) {
+                    AnimeApi.getAnimeDetail(animeSlug)
+                } else {
+                    OtakuApi.getAnimeDetail(animeSlug)
+                }
             detail = d
             if (d == null) errorMessage = "Gagal memuat detail anime."
         } catch (e: Exception) {
@@ -218,7 +225,7 @@ fun EpisodeDetailScreen(
 
                     // ── DAFTAR EPISODE DENGAN TIMELINE WATCH PROGRESS ──
                     itemsIndexed(d.episodes) { index, ep ->
-                        val epProg = prefs.getEpisodeProgress(ep.slug)
+                        val epProg = prefs.getEpisodeProgress(ep.slug, source)
                         val hasWatched = epProg > 0f
                         val isDone = epProg >= 0.9f
                         val isLastWatched = lastWatched?.lastEpSlug == ep.slug

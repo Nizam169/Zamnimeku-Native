@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.data.model.HistoryItem
 import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.theme.*
@@ -30,7 +31,7 @@ import com.zamnimeku.app.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
-    onHistoryClick: (String, String, String, Int) -> Unit
+    onHistoryClick: (String, String, String, Int, AnimeSource) -> Unit
 ) {
     val context = LocalContext.current
     val prefs = remember { AppPreferences(context) }
@@ -119,7 +120,7 @@ fun HistoryScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable {
-                                    onHistoryClick(item.animeSlug, item.animeTitle, item.animeThumb, item.lastEpIndex)
+                                    onHistoryClick(item.animeSlug, item.animeTitle, item.animeThumb, item.lastEpIndex, item.source)
                                 },
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = WibukuSurface),
@@ -172,7 +173,7 @@ fun HistoryScreen(
                                 }
 
                                 IconButton(onClick = {
-                                    prefs.deleteHistoryItem(item.animeSlug)
+                                    prefs.deleteHistoryItem(item.animeSlug, item.source)
                                     refresh()
                                 }) {
                                     Icon(

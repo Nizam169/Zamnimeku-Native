@@ -17,7 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zamnimeku.app.data.api.AnimeApi
+import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.data.model.AnimeCard
+import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.data.model.Genre
 import com.zamnimeku.app.ui.components.AnimeCardView
 import com.zamnimeku.app.ui.components.ErrorView
@@ -28,8 +30,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GenreScreen(
-    onAnimeClick: (String, String, String) -> Unit
+    onAnimeClick: (String, String, String) -> Unit,
+    source: AnimeSource = AnimeSource.OTAKUDESU
 ) {
+    val useMyNimeku = source == AnimeSource.MYNIMEKU
     val scope = rememberCoroutineScope()
     var genres by remember { mutableStateOf<List<Genre>>(emptyList()) }
     var selectedGenre by remember { mutableStateOf<Genre?>(null) }
@@ -51,7 +55,11 @@ fun GenreScreen(
             }
             try {
                 val p = if (initial) 1 else page + 1
-                val items = AnimeApi.getAnimeByGenre(genre.slug, p)
+                val items = if (useMyNimeku) {
+                    AnimeApi.getAnimeByGenre(genre.slug, p)
+                } else {
+                    OtakuApi.getAnimeByGenre(genre.slug, p)
+                }
                 if (initial) {
                     animeList = items
                     page = 1
@@ -72,7 +80,11 @@ fun GenreScreen(
     LaunchedEffect(Unit) {
         isLoading = true
         try {
-            val list = AnimeApi.getGenreList()
+            val list = if (useMyNimeku) {
+                AnimeApi.getGenreList()
+            } else {
+                OtakuApi.getGenreList()
+            }
             genres = list
             if (list.isNotEmpty()) {
                 selectedGenre = list.first()

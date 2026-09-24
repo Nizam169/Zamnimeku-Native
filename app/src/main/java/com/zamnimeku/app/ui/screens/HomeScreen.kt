@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zamnimeku.app.data.api.AnimeApi
+import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.data.model.AnimeCard
+import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.ui.components.AnimeCardView
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
@@ -38,10 +40,13 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onAnimeClick: (String, String, String) -> Unit,
     onSearchClick: () -> Unit,
-    onCheckUpdate: () -> Unit = {}
+    onCheckUpdate: () -> Unit = {},
+    source: AnimeSource = AnimeSource.OTAKUDESU
 ) {
+    val useMyNimeku = source == AnimeSource.MYNIMEKU
     var selectedTab by remember { mutableStateOf(0) }
     var selectedCategory by remember { mutableStateOf("Semua") }
+    var loadedSource by remember { mutableStateOf(source) }
     val scope = rememberCoroutineScope()
 
     var ongoingList by remember { mutableStateOf<List<AnimeCard>>(emptyList()) }
@@ -68,7 +73,11 @@ fun HomeScreen(
         scope.launch {
             isSearching = true
             try {
-                val results = AnimeApi.searchAnime(query.trim())
+                val results = if (useMyNimeku) {
+                    AnimeApi.searchAnime(query.trim())
+                } else {
+                    OtakuApi.searchAnime(query.trim())
+                }
                 searchResults = results
             } catch (_: Exception) {}
             finally {
@@ -88,7 +97,11 @@ fun HomeScreen(
             try {
                 if (selectedTab == 0) {
                     val p = if (initial) 1 else ongoingPage + 1
-                    val items = AnimeApi.getOngoingAnime(p)
+                    val items = if (useMyNimeku) {
+                        AnimeApi.getOngoingAnime(p)
+                    } else {
+                        OtakuApi.getOngoingAnime(p)
+                    }
                     if (initial) {
                         ongoingList = items
                         ongoingPage = 1
@@ -99,7 +112,11 @@ fun HomeScreen(
                     }
                 } else {
                     val p = if (initial) 1 else completePage + 1
-                    val items = AnimeApi.getCompleteAnime(p)
+                    val items = if (useMyNimeku) {
+                        AnimeApi.getCompleteAnime(p)
+                    } else {
+                        OtakuApi.getCompleteAnime(p)
+                    }
                     if (initial) {
                         completeList = items
                         completePage = 1
@@ -118,7 +135,16 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(selectedTab) {
+    LaunchedEffect(selectedTab, source) {
+        if (loadedSource != source) {
+            ongoingList = emptyList()
+            completeList = emptyList()
+            ongoingPage = 1
+            completePage = 1
+            searchResults = emptyList()
+            searchMode = false
+            loadedSource = source
+        }
         if (selectedTab == 0 && ongoingList.isEmpty()) {
             loadData(initial = true)
         } else if (selectedTab == 1 && completeList.isEmpty()) {
@@ -171,7 +197,7 @@ fun HomeScreen(
                                 fontSize = 20.sp
                             )
                             Text(
-                                text = "Nonton anime sub Indo",
+                                text = if (useMyNimeku) "MyNimeku • Anime2" else "Otakudesu • Anime Sub Indo",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = WibukuMuted,
                                 fontSize = 12.sp
@@ -316,26 +342,28 @@ fun HomeScreen(
                         }
                     }
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("Semua", "Anime", "Donghua", "Hentai").forEach { category ->
-                            Surface(
-                                modifier = Modifier.clickable { selectedCategory = category },
-                                color = if (selectedCategory == category) WibukuPrimary else Color.White,
-                                shape = RoundedCornerShape(18.dp)
-                            ) {
-                                Text(
-                                    text = category,
-                                    color = if (selectedCategory == category) Color.White else WibukuMuted,
-                                    fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                                )
+                    if (useMyNimeku) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("Semua", "Anime", "Donghua", "Hentai").forEach { category ->
+                                Surface(
+                                    modifier = Modifier.clickable { selectedCategory = category },
+                                    color = if (selectedCategory == category) WibukuPrimary else Color.White,
+                                    shape = RoundedCornerShape(18.dp)
+                                ) {
+                                    Text(
+                                        text = category,
+                                        color = if (selectedCategory == category) Color.White else WibukuMuted,
+                                        fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -349,7 +377,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            val visibleSearchResults = if (selectedCategory == "Semua") {
+            val visibleSearchResults = if (!useMyNimeku || selectedCategory == "Semua") {
                 searchResults
             } else {
                 searchResults.filter { it.category == selectedCategory }
@@ -378,7 +406,7 @@ fun HomeScreen(
                 }
             } else {
                 val list = if (selectedTab == 0) ongoingList else completeList
-                val visibleList = if (selectedCategory == "Semua") {
+                val visibleList = if (!useMyNimeku || selectedCategory == "Semua") {
                     list
                 } else {
                     list.filter { it.category == selectedCategory }

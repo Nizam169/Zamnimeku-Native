@@ -29,7 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.zamnimeku.app.data.api.AnimeApi
+import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import kotlinx.coroutines.Dispatchers
@@ -130,6 +130,10 @@ class ScheduleViewModel : ViewModel() {
         loadRealSchedule()
     }
 
+    private fun todayIndex(): Int {
+        return (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1).coerceIn(0, 6)
+    }
+
     private fun dayNameToIndex(name: String): Int {
         val n = name.lowercase()
         return when {
@@ -153,25 +157,31 @@ class ScheduleViewModel : ViewModel() {
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val real = withContext(Dispatchers.IO) { AnimeApi.getSchedule() }
+                val real = withContext(Dispatchers.IO) { OtakuApi.getSchedule() }
                 if (real.isEmpty()) {
-                    _errorMessage.value = "Update series tidak ditemukan."
+                    _errorMessage.value = "Jadwal tidak ditemukan."
                     _scheduleMap.value = emptyMap()
                 } else {
+                    val today = todayIndex()
+                    val dateByDay = _days.value.associate { it.dayIndex to it.dateNum }
+                    val nameByDay = _days.value.associate { it.dayIndex to it.fullName }
                     val mapped = mutableMapOf<Int, MutableList<AnimeSchedule>>()
                     for (day in real) {
                         val idx = dayNameToIndex(day.day)
                         if (idx == -1) continue
+                        val dayName = nameByDay[idx] ?: day.day
+                        val dateNum = dateByDay[idx] ?: 0
+                        val aired = idx <= today
                         val list = day.animes.map { card ->
                             AnimeSchedule(
                                 title = card.title,
                                 slug = card.slug,
-                                episode = card.episode.ifEmpty { "Episode baru" },
-                                time = card.date.ifEmpty { "Update" },
+                                episode = "Setiap $dayName",
+                                time = if (dateNum > 0) "Tgl $dateNum" else "-",
                                 views = "-",
-                                rating = card.score.ifEmpty { "-" },
-                                posterUrl = card.thumb,
-                                isAired = true
+                                rating = "-",
+                                posterUrl = "",
+                                isAired = aired
                             )
                         }
                         mapped.getOrPut(idx) { mutableListOf() }.addAll(list)
@@ -182,14 +192,14 @@ class ScheduleViewModel : ViewModel() {
                     }
                     _scheduleMap.value = mapped
                     if (mapped.isEmpty()) {
-                        _errorMessage.value = "Update series tidak ditemukan."
+                        _errorMessage.value = "Jadwal tidak ditemukan."
                     } else {
                         // Ambil foto + info episode di background untuk hari ini
                         fetchDetailsForDay(_selectedDayIndex.value)
                     }
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Gagal memuat update series: ${e.message}"
+                _errorMessage.value = "Gagal memuat jadwal: ${e.message}"
                 _scheduleMap.value = emptyMap()
             } finally {
                 _isLoading.value = false
@@ -207,7 +217,7 @@ class ScheduleViewModel : ViewModel() {
                     missing.take(12).map { item ->
                         async {
                             try {
-                                val d = AnimeApi.getAnimeDetail(item.slug)
+                                val d = OtakuApi.getAnimeDetail(item.slug)
                                 if (d != null) {
                                     thumbCache[item.slug] = d.thumb
                                     scoreCache[item.slug] = d.score
@@ -279,7 +289,7 @@ fun ScheduleScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Update Series",
+                        text = "Jadwal Tayang",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = ColorTextPrimary,
@@ -308,13 +318,13 @@ fun ScheduleScreen(
                 .background(ColorBgScreen)
         ) {
             when {
-                isLoading -> LoadingView(text = "Memuat update series...")
+                isLoading -> LoadingView(text = "Memuat jadwal rilis...")
                 errorMessage != null && currentAnimeList.isEmpty() -> ErrorView(
-                    message = errorMessage ?: "Gagal memuat update series",
+                    message = errorMessage ?: "Gagal memuat jadwal",
                     onRetry = { viewModel.retry() }
                 )
                 currentAnimeList.isEmpty() -> ErrorView(
-                    message = "Belum ada update series.",
+                    message = "Belum ada jadwal untuk hari ini.",
                     onRetry = { viewModel.retry() }
                 )
                 else -> {

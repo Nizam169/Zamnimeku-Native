@@ -40,9 +40,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
 
-// 5 Menu Tetap Wibuku (Random dihapus sesuai permintaan)
 enum class NavTab(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Rounded.GridView),
+    ANIME2("Anime2", Icons.Rounded.LiveTv),
     GENRE("Genre", Icons.Rounded.Category),
     SCHEDULE("Jadwal", Icons.Rounded.CalendarMonth),
     MANGA("Komik", Icons.Rounded.MenuBook),

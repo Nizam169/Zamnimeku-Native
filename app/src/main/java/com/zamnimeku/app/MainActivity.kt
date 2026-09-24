@@ -15,8 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zamnimeku.app.data.api.AnimeApi
+import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.data.api.UpdateApi
 import com.zamnimeku.app.data.api.UpdateInfo
+import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.data.model.Episode
 import com.zamnimeku.app.data.notify.UpdateNotifier
 import com.zamnimeku.app.data.storage.AppPreferences
@@ -30,13 +32,19 @@ import kotlinx.coroutines.launch
 
 sealed class Screen {
     object Main : Screen()
-    data class AnimeDetail(val slug: String, val title: String, val thumb: String) : Screen()
+    data class AnimeDetail(
+        val slug: String,
+        val title: String,
+        val thumb: String,
+        val source: AnimeSource = AnimeSource.OTAKUDESU
+    ) : Screen()
     data class Player(
         val episodes: List<Episode>,
         val initialIndex: Int,
         val animeTitle: String,
         val animeSlug: String,
-        val animeThumb: String
+        val animeThumb: String,
+        val source: AnimeSource = AnimeSource.OTAKUDESU
     ) : Screen()
     data class MangaDetail(val slug: String, val title: String, val thumb: String) : Screen()
     data class MangaReader(val chapterSlug: String, val chapterTitle: String) : Screen()
@@ -177,20 +185,30 @@ fun MainApp() {
                     when (currentTab) {
                         NavTab.HOME -> HomeScreen(
                             onAnimeClick = { slug, title, thumb ->
-                                navigateTo(Screen.AnimeDetail(slug, title, thumb))
+                                navigateTo(Screen.AnimeDetail(slug, title, thumb, AnimeSource.OTAKUDESU))
                             },
                             onSearchClick = {},
-                            onCheckUpdate = { runUpdateCheck(manual = true) }
+                            onCheckUpdate = { runUpdateCheck(manual = true) },
+                            source = AnimeSource.OTAKUDESU
                         )
                         NavTab.GENRE -> GenreScreen(
                             onAnimeClick = { slug, title, thumb ->
-                                navigateTo(Screen.AnimeDetail(slug, title, thumb))
-                            }
+                                navigateTo(Screen.AnimeDetail(slug, title, thumb, AnimeSource.OTAKUDESU))
+                            },
+                            source = AnimeSource.OTAKUDESU
                         )
                         NavTab.SCHEDULE -> ScheduleScreen(
                             onAnimeClick = { slug, title, thumb ->
-                                navigateTo(Screen.AnimeDetail(slug, title, thumb))
+                                navigateTo(Screen.AnimeDetail(slug, title, thumb, AnimeSource.OTAKUDESU))
                             }
+                        )
+                        NavTab.ANIME2 -> HomeScreen(
+                            onAnimeClick = { slug, title, thumb ->
+                                navigateTo(Screen.AnimeDetail(slug, title, thumb, AnimeSource.MYNIMEKU))
+                            },
+                            onSearchClick = {},
+                            onCheckUpdate = { runUpdateCheck(manual = true) },
+                            source = AnimeSource.MYNIMEKU
                         )
                         NavTab.MANGA -> MangaListScreen(
                             onMangaClick = { slug, title, thumb ->
@@ -198,8 +216,8 @@ fun MainApp() {
                             }
                         )
                         NavTab.HISTORY -> HistoryScreen(
-                            onHistoryClick = { slug, title, thumb, _ ->
-                                navigateTo(Screen.AnimeDetail(slug, title, thumb))
+                            onHistoryClick = { slug, title, thumb, _, source ->
+                                navigateTo(Screen.AnimeDetail(slug, title, thumb, source))
                             }
                         )
                     }
@@ -210,6 +228,7 @@ fun MainApp() {
                         animeSlug = screen.slug,
                         animeTitle = screen.title,
                         animeThumb = screen.thumb,
+                        source = screen.source,
                         onBack = { popBack() },
                         onEpisodeClick = { epIndex, _ ->
                             navigateTo(
@@ -218,7 +237,8 @@ fun MainApp() {
                                     initialIndex = epIndex,
                                     animeTitle = screen.title,
                                     animeSlug = screen.slug,
-                                    animeThumb = screen.thumb
+                                    animeThumb = screen.thumb,
+                                    source = screen.source
                                 )
                             )
                         }
@@ -226,13 +246,17 @@ fun MainApp() {
                 }
 
                 is Screen.Player -> {
-                    var loadedEpisodes by remember { mutableStateOf(screen.episodes) }
-                    var isFetchingEpisodes by remember { mutableStateOf(screen.episodes.isEmpty()) }
+                    var loadedEpisodes by remember(screen) { mutableStateOf(screen.episodes) }
+                    var isFetchingEpisodes by remember(screen) { mutableStateOf(screen.episodes.isEmpty()) }
 
-                    LaunchedEffect(screen.animeSlug) {
+                    LaunchedEffect(screen.animeSlug, screen.source) {
                         if (loadedEpisodes.isEmpty()) {
                             try {
-                                val d = AnimeApi.getAnimeDetail(screen.animeSlug)
+                                val d = if (screen.source == AnimeSource.MYNIMEKU) {
+                                    AnimeApi.getAnimeDetail(screen.animeSlug)
+                                } else {
+                                    OtakuApi.getAnimeDetail(screen.animeSlug)
+                                }
                                 if (d != null) {
                                     loadedEpisodes = d.episodes
                                 }
@@ -246,14 +270,17 @@ fun MainApp() {
                     if (isFetchingEpisodes) {
                         LoadingView(text = "Menyiapkan episode...")
                     } else {
-                        PlayerScreen(
-                            episodes = loadedEpisodes,
-                            initialIndex = screen.initialIndex,
-                            animeTitle = screen.animeTitle,
-                            animeSlug = screen.animeSlug,
-                            animeThumb = screen.animeThumb,
-                            onBack = { popBack() }
-                        )
+                        key(screen.animeSlug, screen.source) {
+                            PlayerScreen(
+                                episodes = loadedEpisodes,
+                                initialIndex = screen.initialIndex,
+                                animeTitle = screen.animeTitle,
+                                animeSlug = screen.animeSlug,
+                                animeThumb = screen.animeThumb,
+                                source = screen.source,
+                                onBack = { popBack() }
+                            )
+                        }
                     }
                 }
 
