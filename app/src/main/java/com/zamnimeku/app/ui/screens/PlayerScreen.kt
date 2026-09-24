@@ -377,8 +377,37 @@ fun PlayerScreen(
                     }
                 }
             },
+            onServerSelected = { q, server ->
+                val candidate = candidates.firstOrNull { it.quality == q }
+                val selectedUrl = candidate?.let {
+                    if (it.server.equals(server, ignoreCase = true)) {
+                        it.url
+                    } else {
+                        val index = it.backupServers.indexOfFirst { value ->
+                            value.equals(server, ignoreCase = true)
+                        }
+                        it.backupUrls.getOrNull(index)
+                    }
+                }
+                if (candidate != null && selectedUrl != null) {
+                    selectedQuality = q
+                    if (selectedUrl != currentUrl) {
+                        val keepPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
+                        playSource(candidate, selectedUrl, keepPosition)
+                    }
+                }
+            },
             onDismiss = { showQualityDialog = false },
             qualityUrls = candidates.associate { it.quality to it.url },
+            serverOptions = candidates.associate { source ->
+                val options = buildList {
+                    add(source.server to source.url)
+                    source.backupServers.forEachIndexed { index, server ->
+                        source.backupUrls.getOrNull(index)?.let { add(server to it) }
+                    }
+                }
+                source.quality to options.distinctBy { it.first.lowercase() }
+            },
             currentUrl = currentUrl
         )
     }

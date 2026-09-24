@@ -448,7 +448,8 @@ object AnimeApi {
                 quality = quality,
                 server = candidates.first().server,
                 url = candidates.first().url,
-                backupUrls = candidates.drop(1).map { it.url }
+                backupUrls = candidates.drop(1).map { it.url },
+                backupServers = candidates.drop(1).map { it.server }
             )
         }
     }

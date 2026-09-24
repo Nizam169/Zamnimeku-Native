@@ -28,7 +28,8 @@ data class VideoSource(
     val quality: String,
     val server: String,
     val url: String,
-    val backupUrls: List<String> = emptyList()
+    val backupUrls: List<String> = emptyList(),
+    val backupServers: List<String> = emptyList()
 )
 
 data class AnimeDetail(

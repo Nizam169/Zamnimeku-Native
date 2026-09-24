@@ -634,7 +634,8 @@ object OtakuApi {
                 quality = quality,
                 server = sortedCandidates.first().server,
                 url = sortedCandidates.first().url,
-                backupUrls = sortedCandidates.drop(1).map { it.url }
+                backupUrls = sortedCandidates.drop(1).map { it.url },
+                backupServers = sortedCandidates.drop(1).map { it.server }
             )
         }
     }

@@ -9,8 +9,9 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -344,7 +345,9 @@ fun QualitySelectionDialog(
     currentQuality: String,
     onQualitySelected: (String) -> Unit,
     onDismiss: () -> Unit,
+    onServerSelected: (String, String) -> Unit = { _, _ -> },
     qualityUrls: Map<String, String> = emptyMap(),
+    serverOptions: Map<String, List<Pair<String, String>>> = emptyMap(),
     // URL yang sedang diputar — opsi dengan sumber identik ditandai
     currentUrl: String = ""
 ) {
@@ -358,6 +361,7 @@ fun QualitySelectionDialog(
         .filterNot { quality -> standardQualities.any { it.first == quality } }
         .map { quality -> quality to "Kualitas asli dari server" })
         .distinctBy { it.first }
+    var expandedQuality by remember(currentQuality) { mutableStateOf(currentQuality) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -367,7 +371,7 @@ fun QualitySelectionDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.HighQuality, contentDescription = null, tint = WibukuPrimary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Kualitas Video", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Kualitas & Server", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         },
         text = {
@@ -385,6 +389,7 @@ fun QualitySelectionDialog(
                     val isSelected = q == currentQuality
                     val itemUrl = qualityUrls[q]
                     val hasUrl = itemUrl != null
+                    val servers = serverOptions[q].orEmpty()
                     // Sumber identik dengan yang sedang diputar
                     val sameSource = itemUrl != null && currentUrl.isNotEmpty() && itemUrl == currentUrl
                     val descText = when {
@@ -398,8 +403,9 @@ fun QualitySelectionDialog(
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .clickable(enabled = hasUrl) {
+                                expandedQuality = q
                                 onQualitySelected(q)
-                                onDismiss()
+                                if (servers.size <= 1) onDismiss()
                             },
                         color = if (isSelected) WibukuPrimary.copy(alpha = 0.2f) else Color.White.copy(alpha = if (hasUrl) 0.08f else 0.04f),
                         shape = RoundedCornerShape(10.dp),
@@ -428,6 +434,60 @@ fun QualitySelectionDialog(
                             }
                             if (isSelected) {
                                 Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = WibukuPrimary, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+                }
+                val expandedServers = serverOptions[expandedQuality].orEmpty()
+                if (expandedServers.size > 1) {
+                    Text(
+                        text = "Server $expandedQuality",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(top = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        expandedServers.forEach { (server, url) ->
+                            val isCurrent = currentUrl.isNotEmpty() && currentUrl == url
+                            Surface(
+                                modifier = Modifier.clickable {
+                                    onServerSelected(expandedQuality, server)
+                                    onDismiss()
+                                },
+                                color = if (isCurrent) WibukuPrimary else Color.White.copy(alpha = 0.09f),
+                                shape = RoundedCornerShape(16.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isCurrent) WibukuPrimary else Color.White.copy(alpha = 0.12f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (isCurrent) {
+                                        Icon(
+                                            Icons.Rounded.CheckCircle,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
+                                    Text(
+                                        text = server,
+                                        color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.8f),
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
