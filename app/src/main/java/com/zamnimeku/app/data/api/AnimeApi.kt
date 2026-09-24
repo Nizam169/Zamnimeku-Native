@@ -25,6 +25,23 @@ object AnimeApi {
     private const val SERIES_TYPES = "BD,LA,MOVIE,MUSIC,ONA,OVA,SPECIAL,TV"
     private val QUALITY_ORDER = listOf("360p", "480p", "720p", "1080p")
     private val QUALITY_PATTERN = Regex("""(360|480|720|1080)\s*P""", RegexOption.IGNORE_CASE)
+    private val DONGHUA_MARKERS = listOf(
+        "donghua",
+        "quanzhi gaoshou",
+        "dianfeng rongyao",
+        "shiguang dailiren",
+        "tian guan cifu",
+        "xue yu xin",
+        "shenhai",
+        "battle through the heavens",
+        "perfect world",
+        "martial reverie",
+        "against the gods",
+        "heavenly demon emperor",
+        "swallowed star",
+        "the daily life of the immortal king",
+        "tales of the demons and gods"
+    )
 
     private data class PlayerCandidate(
         val server: String,
@@ -46,26 +63,29 @@ object AnimeApi {
         .build()
 
     private fun getHtml(url: String): String {
-        return try {
-            val request = Request.Builder().url(url).build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) "" else response.body?.string() ?: ""
-            }
-        } catch (_: Exception) {
-            ""
+        repeat(2) {
+            try {
+                val request = Request.Builder().url(url).build()
+                val body = client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) "" else response.body?.string() ?: ""
+                }
+                if (body.isNotEmpty()) return body
+            } catch (_: Exception) {}
         }
+        return ""
     }
 
     private fun getJson(url: String): JSONArray {
-        return try {
-            val request = Request.Builder().url(url).build()
-            val body = client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) "" else response.body?.string() ?: ""
-            }
-            if (body.isEmpty()) JSONArray() else JSONArray(body)
-        } catch (_: Exception) {
-            JSONArray()
+        repeat(2) {
+            try {
+                val request = Request.Builder().url(url).build()
+                val body = client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) "" else response.body?.string() ?: ""
+                }
+                if (body.isNotEmpty()) return JSONArray(body)
+            } catch (_: Exception) {}
         }
+        return JSONArray()
     }
 
     private fun normalizeHttpUrl(rawUrl: String, baseUrl: String = "$BASE_URL/"): String? {
@@ -98,6 +118,13 @@ object AnimeApi {
             clean == "?" ||
             clean.contains("Unknown", ignoreCase = true)
         ) "" else clean
+    }
+
+    private fun categoryFor(title: String, slug: String, genres: List<String>): String {
+        val genreText = genres.joinToString(" ").lowercase()
+        if (genreText.contains("hentai") || title.lowercase().contains("hentai")) return "Hentai"
+        val identity = "$title $slug".lowercase()
+        return if (DONGHUA_MARKERS.any { identity.contains(it) }) "Donghua" else "Anime"
     }
 
     private fun pathSegment(value: String): String {
@@ -135,13 +162,15 @@ object AnimeApi {
             if (link.isEmpty() || title.isEmpty()) return@mapNotNull null
             val type = cleanField(item.selectFirst(".mynimeku-mix-feed__type")?.text().orEmpty())
             val status = cleanField(item.selectFirst(".mynimeku-mix-feed__status")?.text().orEmpty())
+            val genres = item.select(".mynimeku-mix-feed__genre").map { it.text().trim() }
             AnimeCard(
                 title = title,
                 slug = cleanSlug(link),
                 url = link,
                 thumb = imageUrl(item),
                 episode = type,
-                day = status
+                day = status,
+                category = categoryFor(title, link, genres)
             )
         }
     }
@@ -151,13 +180,15 @@ object AnimeApi {
             val link = item.selectFirst("a[href*=\"/series/\"]")?.attr("href")?.trim().orEmpty()
             val title = item.selectFirst(".mynimeku-search-feed__series-title")?.text()?.trim().orEmpty()
             if (link.isEmpty() || title.isEmpty()) return@mapNotNull null
+            val genres = item.select(".mynimeku-search-feed__genre").map { it.text().trim() }
             AnimeCard(
                 title = title,
                 slug = cleanSlug(link),
                 url = link,
                 thumb = imageUrl(item),
                 episode = cleanField(item.selectFirst(".mynimeku-search-feed__type")?.text().orEmpty()),
-                day = cleanField(item.selectFirst(".mynimeku-search-feed__status")?.text().orEmpty())
+                day = cleanField(item.selectFirst(".mynimeku-search-feed__status")?.text().orEmpty()),
+                category = categoryFor(title, link, genres)
             )
         }
     }
@@ -169,16 +200,28 @@ object AnimeApi {
                 val link = item.optString("link").trim()
                 val title = Jsoup.parse(item.optJSONObject("title")?.optString("rendered").orEmpty()).text()
                 if (link.isEmpty() || title.isEmpty()) continue
-                val media = item.optJSONObject("_embedded")
+                val embedded = item.optJSONObject("_embedded")
+                val media = embedded
                     ?.optJSONArray("wp:featuredmedia")
                     ?.optJSONObject(0)
                 val thumb = media?.optString("source_url").orEmpty()
+                val genres = buildList {
+                    val groups = embedded?.optJSONArray("wp:term") ?: return@buildList
+                    for (groupIndex in 0 until groups.length()) {
+                        val group = groups.optJSONArray(groupIndex) ?: continue
+                        for (termIndex in 0 until group.length()) {
+                            val term = group.optJSONObject(termIndex) ?: continue
+                            if (term.optString("taxonomy") == "genre") add(term.optString("name"))
+                        }
+                    }
+                }
                 add(
                     AnimeCard(
                         title = title,
                         slug = cleanSlug(link),
                         url = link,
-                        thumb = normalizeHttpUrl(thumb).orEmpty()
+                        thumb = normalizeHttpUrl(thumb).orEmpty(),
+                        category = categoryFor(title, link, genres)
                     )
                 )
             }
@@ -199,24 +242,30 @@ object AnimeApi {
                 thumb = imageUrl(item),
                 episode = latest,
                 day = badges.getOrNull(1).orEmpty(),
-                date = cleanField(item.selectFirst(".mynimeku-update-feed__date")?.text().orEmpty())
+                date = cleanField(item.selectFirst(".mynimeku-update-feed__date")?.text().orEmpty()),
+                category = categoryFor(title, link, emptyList())
             )
         }
     }
 
-    private suspend fun getCatalog(path: String, page: Int): List<AnimeCard> = withContext(Dispatchers.IO) {
+    private suspend fun getCatalog(path: String, page: Int, fallbackStatus: String): List<AnimeCard> = withContext(Dispatchers.IO) {
         val pagePath = if (page > 1) "$path/page/$page/" else "$path"
         val html = getHtml("$BASE_URL$pagePath")
-        if (html.isEmpty()) return@withContext emptyList()
-        parseCatalogCards(Jsoup.parse(html))
+        if (html.isNotEmpty()) {
+            val cards = parseCatalogCards(Jsoup.parse(html))
+            if (cards.isNotEmpty()) return@withContext cards
+        }
+        parseRestSearch(
+            getJson("$BASE_URL/wp-json/wp/v2/series?per_page=24&page=$page&orderby=modified&_embed=1")
+        ).map { it.copy(day = fallbackStatus) }
     }
 
     suspend fun getOngoingAnime(page: Int = 1): List<AnimeCard> {
-        return getCatalog("/full-list/mix/s:on-going~t:$SERIES_TYPES/", page)
+        return getCatalog("/full-list/mix/s:on-going~t:$SERIES_TYPES/", page, "On-Going")
     }
 
     suspend fun getCompleteAnime(page: Int = 1): List<AnimeCard> {
-        return getCatalog("/full-list/mix/s:completed~t:$SERIES_TYPES/", page)
+        return getCatalog("/full-list/mix/s:completed~t:$SERIES_TYPES/", page, "Completed")
     }
 
     suspend fun searchAnime(keyword: String): List<AnimeCard> = withContext(Dispatchers.IO) {
@@ -239,39 +288,65 @@ object AnimeApi {
 
     suspend fun getGenreList(): List<Genre> = withContext(Dispatchers.IO) {
         val html = getHtml("$BASE_URL/genre-list/")
-        if (html.isEmpty()) return@withContext emptyList()
-        val document = Jsoup.parse(html)
-        document.select("a[href*=\"/genre/\"]").mapNotNull { link ->
-            val url = link.attr("href").trim()
-            val name = link.text().trim()
-            if (url.isEmpty() || name.isEmpty()) return@mapNotNull null
-            Genre(name = name, slug = cleanSlug(url), url = url)
-        }.distinctBy { it.slug }
+        if (html.isNotEmpty()) {
+            val document = Jsoup.parse(html)
+            val genres = document.select("a[href*=\"/genre/\"]").mapNotNull { link ->
+                val url = link.attr("href").trim()
+                val name = link.text().trim()
+                if (url.isEmpty() || name.isEmpty()) return@mapNotNull null
+                Genre(name = name, slug = cleanSlug(url), url = url)
+            }.distinctBy { it.slug }
+            if (genres.isNotEmpty()) return@withContext genres
+        }
+        buildList {
+            val items = getJson("$BASE_URL/wp-json/wp/v2/genre?per_page=100&hide_empty=true")
+            for (index in 0 until items.length()) {
+                val item = items.optJSONObject(index) ?: continue
+                val slug = item.optString("slug").trim()
+                if (slug.isEmpty()) continue
+                add(Genre(name = item.optString("name").trim(), slug = slug, url = "$BASE_URL/genre/$slug/"))
+            }
+        }
     }
 
     suspend fun getAnimeByGenre(genreSlug: String, page: Int = 1): List<AnimeCard> = withContext(Dispatchers.IO) {
         val pagePath = if (page > 1) "/genre/$genreSlug/page/$page/" else "/genre/$genreSlug/"
         val html = getHtml("$BASE_URL$pagePath")
-        if (html.isEmpty()) return@withContext emptyList()
-        Jsoup.parse(html).select(".mynimeku-taxmix-feed__item").mapNotNull { item ->
-            val link = item.selectFirst("a[href*=\"/series/\"]")?.attr("href")?.trim().orEmpty()
-            val title = item.selectFirst(".mynimeku-taxmix-feed__series-title")?.text()?.trim().orEmpty()
-            if (link.isEmpty() || title.isEmpty()) return@mapNotNull null
-            AnimeCard(
-                title = title,
-                slug = cleanSlug(link),
-                url = link,
-                thumb = imageUrl(item),
-                episode = cleanField(item.selectFirst(".mynimeku-taxmix-feed__type")?.text().orEmpty()),
-                day = cleanField(item.selectFirst(".mynimeku-taxmix-feed__status")?.text().orEmpty())
-            )
+        if (html.isNotEmpty()) {
+            val cards = Jsoup.parse(html).select(".mynimeku-taxmix-feed__item").mapNotNull { item ->
+                val link = item.selectFirst("a[href*=\"/series/\"]")?.attr("href")?.trim().orEmpty()
+                val title = item.selectFirst(".mynimeku-taxmix-feed__series-title")?.text()?.trim().orEmpty()
+                if (link.isEmpty() || title.isEmpty()) return@mapNotNull null
+                val genres = item.select(".mynimeku-taxmix-feed__genre").map { it.text().trim() }
+                AnimeCard(
+                    title = title,
+                    slug = cleanSlug(link),
+                    url = link,
+                    thumb = imageUrl(item),
+                    episode = cleanField(item.selectFirst(".mynimeku-taxmix-feed__type")?.text().orEmpty()),
+                    day = cleanField(item.selectFirst(".mynimeku-taxmix-feed__status")?.text().orEmpty()),
+                    category = categoryFor(title, link, genres)
+                )
+            }
+            if (cards.isNotEmpty()) return@withContext cards
         }
+        val genreItems = getJson("$BASE_URL/wp-json/wp/v2/genre?slug=$genreSlug")
+        val genreId = genreItems.optJSONObject(0)?.optInt("id", 0) ?: 0
+        if (genreId == 0) return@withContext emptyList()
+        parseRestSearch(
+            getJson("$BASE_URL/wp-json/wp/v2/series?genre=$genreId&per_page=24&page=$page&_embed=1")
+        )
     }
 
     suspend fun getSchedule(): List<ScheduleDay> = withContext(Dispatchers.IO) {
         val html = getHtml("$BASE_URL/latest-series/")
-        if (html.isEmpty()) return@withContext emptyList()
-        val cards = parseLatestCards(Jsoup.parse(html))
+        val cards = if (html.isNotEmpty()) {
+            parseLatestCards(Jsoup.parse(html))
+        } else {
+            parseRestSearch(
+                getJson("$BASE_URL/wp-json/wp/v2/series?per_page=24&orderby=modified&_embed=1")
+            )
+        }
         if (cards.isEmpty()) return@withContext emptyList()
         val dayNames = listOf("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
         val today = dayNames[(Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1).coerceIn(0, 6)]

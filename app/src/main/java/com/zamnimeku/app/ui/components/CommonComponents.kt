@@ -139,8 +139,8 @@ fun AnimeCardView(
         if (s.contains("unknown", ignoreCase = true)) "" else s
 
     val epBadge = shown(anime.episode)
-    val scoreBadge = shown(anime.score)
     val dayBadge = shown(anime.day)
+    val categoryBadge = shown(anime.category)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -195,7 +195,7 @@ fun AnimeCardView(
                 }
 
                 // Score / Day badge (Bottom End)
-                val tag = if (scoreBadge.isNotEmpty()) "★ $scoreBadge" else dayBadge
+                val tag = if (categoryBadge.isNotEmpty()) categoryBadge else dayBadge
                 if (tag.isNotEmpty()) {
                     Surface(
                         modifier = Modifier

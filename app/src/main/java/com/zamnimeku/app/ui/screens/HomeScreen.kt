@@ -4,8 +4,10 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -39,6 +41,7 @@ fun HomeScreen(
     onCheckUpdate: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(0) }
+    var selectedCategory by remember { mutableStateOf("Semua") }
     val scope = rememberCoroutineScope()
 
     var ongoingList by remember { mutableStateOf<List<AnimeCard>>(emptyList()) }
@@ -312,6 +315,30 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Semua", "Anime", "Donghua", "Hentai").forEach { category ->
+                            Surface(
+                                modifier = Modifier.clickable { selectedCategory = category },
+                                color = if (selectedCategory == category) WibukuPrimary else Color.White,
+                                shape = RoundedCornerShape(18.dp)
+                            ) {
+                                Text(
+                                    text = category,
+                                    color = if (selectedCategory == category) Color.White else WibukuMuted,
+                                    fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -322,10 +349,15 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            val visibleSearchResults = if (selectedCategory == "Semua") {
+                searchResults
+            } else {
+                searchResults.filter { it.category == selectedCategory }
+            }
             if (searchMode) {
                 if (isSearching) {
                     LoadingView(text = "Mencari anime '$searchQuery'...")
-                } else if (searchResults.isNotEmpty()) {
+                } else if (visibleSearchResults.isNotEmpty()) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
                         contentPadding = PaddingValues(10.dp),
@@ -333,7 +365,7 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(searchResults) { anime ->
+                        items(visibleSearchResults) { anime ->
                             AnimeCardView(anime = anime) {
                                 onAnimeClick(anime.slug, anime.title, anime.thumb)
                             }
@@ -346,11 +378,20 @@ fun HomeScreen(
                 }
             } else {
                 val list = if (selectedTab == 0) ongoingList else completeList
+                val visibleList = if (selectedCategory == "Semua") {
+                    list
+                } else {
+                    list.filter { it.category == selectedCategory }
+                }
 
                 if (isLoading) {
                     LoadingView()
                 } else if (errorMessage != null && list.isEmpty()) {
                     ErrorView(message = errorMessage ?: "Terjadi kesalahan", onRetry = { loadData(initial = true) })
+                } else if (visibleList.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Belum ada $selectedCategory pada halaman ini.", color = WibukuMuted)
+                    }
                 } else {
                     val gridState = rememberLazyGridState()
 
@@ -362,7 +403,7 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(list) { anime ->
+                        items(visibleList) { anime ->
                             AnimeCardView(anime = anime) {
                                 onAnimeClick(anime.slug, anime.title, anime.thumb)
                             }

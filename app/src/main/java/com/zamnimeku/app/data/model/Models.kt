@@ -8,7 +8,8 @@ data class AnimeCard(
     val episode: String = "",
     val day: String = "",
     val date: String = "",
-    val score: String = ""
+    val score: String = "",
+    val category: String = "Anime"
 )
 
 data class Episode(
