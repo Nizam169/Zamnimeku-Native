@@ -89,6 +89,7 @@ fun PlayerScreen(
     var currentUrl by remember { mutableStateOf("") }
     var activeSource by remember { mutableStateOf<VideoSource?>(null) }
     var activeUrlIndex by remember { mutableIntStateOf(0) }
+    val attemptedUrls = remember { mutableSetOf<String>() }
     var isResolving by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -195,6 +196,7 @@ fun PlayerScreen(
         val requestedIndex = urls.indexOf(url).takeIf { it >= 0 } ?: 0
         activeSource = source
         activeUrlIndex = requestedIndex
+        attemptedUrls.add(urls[requestedIndex])
         playUrl(urls[requestedIndex], resumeAt)
     }
 
@@ -225,7 +227,20 @@ fun PlayerScreen(
                 if (source != null && nextIndex in urls.indices) {
                     playSource(source, urls[nextIndex], exoPlayer.currentPosition)
                 } else {
-                    errorMessage = "Gagal memutar video. Silakan ganti resolusi atau coba lagi."
+                    val fallback = candidates.asSequence()
+                        .filter { it.quality != source?.quality }
+                        .mapNotNull { candidate ->
+                            sourceUrls(candidate)
+                                .firstOrNull { url -> url !in attemptedUrls }
+                                ?.let { url -> candidate to url }
+                        }
+                        .firstOrNull()
+                    if (fallback != null) {
+                        selectedQuality = fallback.first.quality
+                        playSource(fallback.first, fallback.second, exoPlayer.currentPosition)
+                    } else {
+                        errorMessage = "Gagal memutar video. Silakan ganti resolusi atau coba lagi."
+                    }
                 }
             }
         }
@@ -280,6 +295,7 @@ fun PlayerScreen(
     }
 
     suspend fun loadEpisodeVideo() {
+        attemptedUrls.clear()
         isResolving = true
         errorMessage = null
         candidates = emptyList()
@@ -371,7 +387,7 @@ fun PlayerScreen(
                     if (cand.url == currentUrl && currentUrl.isNotEmpty()) {
                         // Sumbernya sama persis dengan yang diputar — tidak perlu reload
                     } else {
-                        // Lanjutkan dari detik yang sedang ditonton
+                        attemptedUrls.clear()
                         val keepPos = exoPlayer.currentPosition.coerceAtLeast(0L)
                         playSource(cand, resumeAt = keepPos)
                     }
@@ -392,6 +408,7 @@ fun PlayerScreen(
                 if (candidate != null && selectedUrl != null) {
                     selectedQuality = q
                     if (selectedUrl != currentUrl) {
+                        attemptedUrls.clear()
                         val keepPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
                         playSource(candidate, selectedUrl, keepPosition)
                     }
