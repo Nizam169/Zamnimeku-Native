@@ -405,14 +405,47 @@ object OtakuApi {
         return "${match.groupValues[1]}p"
     }
 
+    private fun isAbsoluteUrlReference(value: String): Boolean {
+        return value.startsWith("http://", ignoreCase = true) ||
+            value.startsWith("https://", ignoreCase = true) ||
+            value.startsWith("//")
+    }
+
     private fun extractKeyedUrl(text: String, baseUrl: String): String? {
-        val mediaKeyMatch = Regex(
-            """["']?\b(?:videoURL|file|hls)\b["']?\s*[:=]\s*["']([^"']+)["']""",
+        val mediaKeyPattern = Regex(
+            """["']?\b(videoURL|file)\b["']?\s*[:=]\s*["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE
+        )
+        val mediaKeys = mediaKeyPattern.findAll(text).mapNotNull { match ->
+            val key = match.groupValues[1]
+            val rawUrl = match.groupValues[2]
+            resolveHttpUrl(rawUrl, baseUrl)?.let { Triple(key, rawUrl, it) }
+        }.toList()
+
+        mediaKeys.firstOrNull { (_, _, url) -> MEDIA_EXTENSION.containsMatchIn(url) }
+            ?.let { return it.third }
+        mediaKeys.firstOrNull { (key, rawUrl, _) ->
+            key.equals("videoURL", ignoreCase = true) && isAbsoluteUrlReference(rawUrl)
+        }?.let { return it.third }
+
+        val hlsMatch = Regex(
+            """["']?\bhls\b["']?\s*[:=]\s*["']([^"']+)["']""",
             RegexOption.IGNORE_CASE
         ).find(text)
-        if (mediaKeyMatch != null) {
-            resolveHttpUrl(mediaKeyMatch.groupValues[1], baseUrl)?.let { return it }
+        if (hlsMatch != null) {
+            val rawUrl = hlsMatch.groupValues[1]
+            resolveHttpUrl(rawUrl, baseUrl)
+                ?.takeIf {
+                    MEDIA_EXTENSION.containsMatchIn(it) ||
+                        isAbsoluteUrlReference(rawUrl) ||
+                        rawUrl.startsWith("/")
+                }
+                ?.let { return it }
         }
+
+        mediaKeys.firstOrNull { (_, rawUrl, _) -> isAbsoluteUrlReference(rawUrl) }
+            ?.let { return it.third }
+
         val sourceMatch = Regex(
             """["']?\bsrc\b["']?\s*[:=]\s*["']([^"']+)["']""",
             RegexOption.IGNORE_CASE
