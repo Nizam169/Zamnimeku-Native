@@ -206,7 +206,7 @@ fun AnimeCardView(
                     ) {
                         Text(
                             text = tag,
-                            color = if (scoreBadge.isNotEmpty()) Color(0xFFFBBF24) else Color.White,
+                            color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
