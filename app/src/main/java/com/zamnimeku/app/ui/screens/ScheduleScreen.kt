@@ -29,7 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.api.AnimeApi
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import kotlinx.coroutines.Dispatchers
@@ -130,10 +130,6 @@ class ScheduleViewModel : ViewModel() {
         loadRealSchedule()
     }
 
-    private fun todayIndex(): Int {
-        return (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1).coerceIn(0, 6)
-    }
-
     private fun dayNameToIndex(name: String): Int {
         val n = name.lowercase()
         return when {
@@ -157,32 +153,25 @@ class ScheduleViewModel : ViewModel() {
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val real = withContext(Dispatchers.IO) { OtakuApi.getSchedule() }
+                val real = withContext(Dispatchers.IO) { AnimeApi.getSchedule() }
                 if (real.isEmpty()) {
-                    _errorMessage.value = "Jadwal tidak ditemukan."
+                    _errorMessage.value = "Update series tidak ditemukan."
                     _scheduleMap.value = emptyMap()
                 } else {
-                    val today = todayIndex()
-                    val dateByDay = _days.value.associate { it.dayIndex to it.dateNum }
-                    val nameByDay = _days.value.associate { it.dayIndex to it.fullName }
                     val mapped = mutableMapOf<Int, MutableList<AnimeSchedule>>()
                     for (day in real) {
                         val idx = dayNameToIndex(day.day)
                         if (idx == -1) continue
-                        val dayName = nameByDay[idx] ?: day.day
-                        val dateNum = dateByDay[idx] ?: 0
-                        // Status tayang ngikutin hari: hari <= hari ini = sudah tayang
-                        val aired = idx <= today
                         val list = day.animes.map { card ->
                             AnimeSchedule(
                                 title = card.title,
                                 slug = card.slug,
-                                episode = "Setiap $dayName",
-                                time = if (dateNum > 0) "Tgl $dateNum" else "-",
+                                episode = card.episode.ifEmpty { "Episode baru" },
+                                time = card.date.ifEmpty { "Update" },
                                 views = "-",
-                                rating = "-",
-                                posterUrl = "",
-                                isAired = aired
+                                rating = card.score.ifEmpty { "-" },
+                                posterUrl = card.thumb,
+                                isAired = true
                             )
                         }
                         mapped.getOrPut(idx) { mutableListOf() }.addAll(list)
@@ -193,14 +182,14 @@ class ScheduleViewModel : ViewModel() {
                     }
                     _scheduleMap.value = mapped
                     if (mapped.isEmpty()) {
-                        _errorMessage.value = "Jadwal tidak ditemukan."
+                        _errorMessage.value = "Update series tidak ditemukan."
                     } else {
                         // Ambil foto + info episode di background untuk hari ini
                         fetchDetailsForDay(_selectedDayIndex.value)
                     }
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Gagal memuat jadwal: ${e.message}"
+                _errorMessage.value = "Gagal memuat update series: ${e.message}"
                 _scheduleMap.value = emptyMap()
             } finally {
                 _isLoading.value = false
@@ -218,7 +207,7 @@ class ScheduleViewModel : ViewModel() {
                     missing.take(12).map { item ->
                         async {
                             try {
-                                val d = OtakuApi.getAnimeDetail(item.slug)
+                                val d = AnimeApi.getAnimeDetail(item.slug)
                                 if (d != null) {
                                     thumbCache[item.slug] = d.thumb
                                     scoreCache[item.slug] = d.score
@@ -253,68 +242,6 @@ class ScheduleViewModel : ViewModel() {
                 _scheduleMap.value = updated
             } catch (_: Exception) {}
         }
-    }
-
-    private fun generateSchedules() {
-        val dummyData = mapOf(
-            0 to listOf( // Minggu
-                AnimeSchedule("One Piece", "one-piece-sub-indo", "Episode 1122", "09:30", "154.2K", "8.92", "https://otakudesu.blog/wp-content/uploads/2021/08/One-Piece-Sub-Indo.jpg", true),
-                AnimeSchedule("Shangri-La Frontier Season 2", "shangri-la-frontier-s2-sub-indo", "Episode 18", "16:30", "42.8K", "8.14", "https://otakudesu.blog/wp-content/uploads/2024/10/Shangri-La-Frontier-Season-2-Sub-Indo.jpg", true),
-                AnimeSchedule("Ranma 1/2 (2024)", "ranma-1-2-2024-sub-indo", "Episode 11", "23:55", "18.5K", "7.65", "https://otakudesu.blog/wp-content/uploads/2024/10/Ranma-1-2-2024-Sub-Indo.jpg", true),
-                AnimeSchedule("Blue Box (Ao no Hako)", "blue-box-sub-indo", "Episode 22", "22:30", "56.1K", "8.45", "https://otakudesu.blog/wp-content/uploads/2024/10/Ao-no-Hako-Sub-Indo.jpg", true),
-                AnimeSchedule("MF Ghost Season 2", "mf-ghost-season-2-sub-indo", "Episode 10", "23:00", "28.9K", "7.88", "https://otakudesu.blog/wp-content/uploads/2024/10/MF-Ghost-Season-2-Sub-Indo.jpg", false),
-                AnimeSchedule("Himitsu no AiPri", "himitsu-no-aipri-sub-indo", "Episode 48", "10:00", "8.4K", "6.94", "https://otakudesu.blog/wp-content/uploads/2024/04/Himitsu-no-AiPri-Sub-Indo.jpg", true)
-            ),
-            1 to listOf( // Senin
-                AnimeSchedule("Bleach: Sennen Kessen-hen Season 3", "bleach-thousand-year-blood-war-s3-sub-indo", "Episode 9", "22:00", "88.3K", "8.85", "https://otakudesu.blog/wp-content/uploads/2024/10/Bleach-Thousand-Year-Blood-War-Part-3-Sub-Indo.jpg", true),
-                AnimeSchedule("Tower of God Season 2", "tower-of-god-s2-sub-indo", "Episode 23", "21:00", "39.5K", "7.52", "https://otakudesu.blog/wp-content/uploads/2024/07/Tower-of-God-Season-2-Sub-Indo.jpg", true),
-                AnimeSchedule("Natsume Yuujinchou Shichi", "natsume-yuujinchou-s7-sub-indo", "Episode 11", "23:00", "19.1K", "8.65", "https://otakudesu.blog/wp-content/uploads/2024/10/Natsume-Yuujinchou-Shichi-Sub-Indo.jpg", true),
-                AnimeSchedule("Kamonohashi Ron no Kindan Suiri S2", "kamonohashi-ron-s2-sub-indo", "Episode 11", "21:30", "14.2K", "7.71", "https://otakudesu.blog/wp-content/uploads/2024/10/Kamonohashi-Ron-no-Kindan-Suiri-Season-2-Sub-Indo.jpg", true),
-                AnimeSchedule("Tsuma, Shougakusei ni Naru.", "tsuma-shougakusei-sub-indo", "Episode 11", "20:30", "12.8K", "7.40", "https://otakudesu.blog/wp-content/uploads/2024/10/Tsuma-Shougakusei-ni-Naru-Sub-Indo.jpg", false),
-                AnimeSchedule("Highspeed Etoile", "highspeed-etoile-sub-indo", "Episode 12", "23:45", "6.2K", "6.50", "https://otakudesu.blog/wp-content/uploads/2024/04/Highspeed-Etoile-Sub-Indo.jpg", false)
-            ),
-            2 to listOf( // Selasa
-                AnimeSchedule("DanMachi Season 5", "dungeon-ni-deai-s5-sub-indo", "Episode 11", "20:00", "92.4K", "8.48", "https://otakudesu.blog/wp-content/uploads/2024/10/DanMachi-Season-5-Sub-Indo.jpg", true),
-                AnimeSchedule("Amagami-san Chi no Enmusubi", "amagami-san-sub-indo", "Episode 12", "22:30", "27.3K", "7.35", "https://otakudesu.blog/wp-content/uploads/2024/10/Amagami-san-Chi-no-Enmusubi-Sub-Indo.jpg", true),
-                AnimeSchedule("Hitoribocchi no Isekai Kouryakuhou", "hitoribocchi-isekai-sub-indo", "Episode 12", "23:00", "34.1K", "7.10", "https://otakudesu.blog/wp-content/uploads/2024/09/Hitoribocchi-no-Isekai-Kouryakuhou-Sub-Indo.jpg", true),
-                AnimeSchedule("NegaPosi Angler", "negaposi-angler-sub-indo", "Episode 11", "21:00", "9.7K", "7.22", "https://otakudesu.blog/wp-content/uploads/2024/10/NegaPosi-Angler-Sub-Indo.jpg", false),
-                AnimeSchedule("Tasogare Out Focus", "tasogare-out-focus-sub-indo", "Episode 12", "22:00", "11.5K", "7.15", "https://otakudesu.blog/wp-content/uploads/2024/07/Tasogare-Out-Focus-Sub-Indo.jpg", false),
-                AnimeSchedule("Shy Season 2", "shy-season-2-sub-indo", "Episode 12", "23:30", "15.8K", "7.29", "https://otakudesu.blog/wp-content/uploads/2024/07/SHY-Season-2-Sub-Indo.jpg", false)
-            ),
-            3 to listOf( // Rabu
-                AnimeSchedule("Re:Zero Season 3", "re-zero-kara-hajimeru-isekai-seikatsu-s3-sub-indo", "Episode 8", "21:30", "168.0K", "8.95", "https://otakudesu.blog/wp-content/uploads/2024/10/ReZero-Season-3-Sub-Indo.jpg", true),
-                AnimeSchedule("Dragon Ball Daima", "dragon-ball-daima-sub-indo", "Episode 10", "22:40", "75.4K", "8.12", "https://otakudesu.blog/wp-content/uploads/2024/10/Dragon-Ball-Daima-Sub-Indo.jpg", true),
-                AnimeSchedule("Across the Sky", "across-the-sky-sub-indo", "Episode 10", "19:00", "16.2K", "7.44", "https://otakudesu.blog/wp-content/uploads/2024/10/Haigakura-Sub-Indo.jpg", true),
-                AnimeSchedule("Kimi wa Meido-sama", "kimi-wa-meido-sama-sub-indo", "Episode 11", "23:30", "31.9K", "7.40", "https://otakudesu.blog/wp-content/uploads/2024/10/Kimi-wa-Meido-sama-Sub-Indo.jpg", true),
-                AnimeSchedule("Sengoku Youko Part 2", "sengoku-youko-part-2-sub-indo", "Episode 21", "23:00", "18.3K", "7.92", "https://otakudesu.blog/wp-content/uploads/2024/07/Sengoku-Youko-Senma-Konton-hen-Sub-Indo.jpg", false),
-                AnimeSchedule("Murai no Koi", "murai-no-koi-sub-indo", "Episode 12", "20:30", "8.9K", "7.08", "https://otakudesu.blog/wp-content/uploads/2024/10/Murai-no-Koi-Sub-Indo.jpg", false)
-            ),
-            4 to listOf( // Kamis
-                AnimeSchedule("Dandadan", "dandadan-sub-indo", "Episode 11", "23:00", "195.4K", "8.80", "https://otakudesu.blog/wp-content/uploads/2024/10/Dandadan-Sub-Indo.jpg", true),
-                AnimeSchedule("Rurouni Kenshin (2023) S2", "rurouni-kenshin-kyoto-souran-sub-indo", "Episode 11", "23:55", "41.7K", "8.05", "https://otakudesu.blog/wp-content/uploads/2024/10/Rurouni-Kenshin-Kyoto-Souran-Sub-Indo.jpg", true),
-                AnimeSchedule("Trillion Game", "trillion-game-sub-indo", "Episode 12", "22:30", "22.6K", "7.68", "https://otakudesu.blog/wp-content/uploads/2024/10/Trillion-Game-Sub-Indo.jpg", true),
-                AnimeSchedule("Mecha-Ude", "mecha-ude-sub-indo", "Episode 11", "21:30", "13.4K", "7.20", "https://otakudesu.blog/wp-content/uploads/2024/10/Mecha-Ude-Sub-Indo.jpg", false),
-                AnimeSchedule("Hoshifuru Oukoku no Nina", "hoshifuru-oukoku-no-nina-sub-indo", "Episode 11", "21:00", "19.8K", "7.55", "https://otakudesu.blog/wp-content/uploads/2024/10/Hoshifuru-Oukoku-no-Nina-Sub-Indo.jpg", false),
-                AnimeSchedule("Yozakura-san Chi no Daisakusen", "yozakura-san-sub-indo", "Episode 26", "17:00", "25.1K", "7.45", "https://otakudesu.blog/wp-content/uploads/2024/04/Yozakura-san-Chi-no-Daisakusen-Sub-Indo.jpg", false)
-            ),
-            5 to listOf( // Jumat
-                AnimeSchedule("Blue Lock Season 2", "blue-lock-vs-u-20-japan-sub-indo", "Episode 11", "22:30", "148.6K", "8.32", "https://otakudesu.blog/wp-content/uploads/2024/10/Blue-Lock-vs-U-20-Japan-Sub-Indo.jpg", true),
-                AnimeSchedule("Sword Art Online Alternative: GGO II", "sao-alternative-gun-gale-online-ii-sub-indo", "Episode 11", "23:30", "64.2K", "7.78", "https://otakudesu.blog/wp-content/uploads/2024/10/Sword-Art-Online-Alternative-Gun-Gale-Online-II-Sub-Indo.jpg", true),
-                AnimeSchedule("Mahoutsukai ni Narenakatta", "mahoutsukai-ni-narenakatta-sub-indo", "Episode 11", "20:30", "8.1K", "6.85", "https://otakudesu.blog/wp-content/uploads/2024/10/Mahoutsukai-ni-Narenakatta-Onnanoko-no-Hanashi-Sub-Indo.jpg", true),
-                AnimeSchedule("Goukon ni Ittara Onna ga Inakatta", "goukon-ni-ittara-sub-indo", "Episode 11", "23:00", "15.7K", "7.38", "https://otakudesu.blog/wp-content/uploads/2024/10/Goukon-ni-Ittara-Onna-ga-Inakatta-Hanashi-Sub-Indo.jpg", false),
-                AnimeSchedule("Raise wa Tanin ga Ii", "raise-wa-tanin-ga-ii-sub-indo", "Episode 11", "22:00", "38.4K", "7.92", "https://otakudesu.blog/wp-content/uploads/2024/10/Raise-wa-Tanin-ga-Ii-Sub-Indo.jpg", false),
-                AnimeSchedule("Fairy Tail: 100 Years Quest", "fairy-tail-100-years-quest-sub-indo", "Episode 23", "16:30", "71.0K", "7.96", "https://otakudesu.blog/wp-content/uploads/2024/07/Fairy-Tail-100-Years-Quest-Sub-Indo.jpg", false)
-            ),
-            6 to listOf( // Sabtu
-                AnimeSchedule("Bleach: Thousand-Year Blood War S3", "bleach-thousand-year-blood-war-s3-sub-indo", "Episode 10", "22:00", "112.5K", "8.85", "https://otakudesu.blog/wp-content/uploads/2024/10/Bleach-Thousand-Year-Blood-War-Part-3-Sub-Indo.jpg", true),
-                AnimeSchedule("Dandadan", "dandadan-sub-indo", "Episode 11", "23:00", "195.4K", "8.80", "https://otakudesu.blog/wp-content/uploads/2024/10/Dandadan-Sub-Indo.jpg", true),
-                AnimeSchedule("Kagaku x Bouken Survival!", "kagaku-x-bouken-survival-sub-indo", "Episode 11", "17:35", "5.8K", "6.70", "https://otakudesu.blog/wp-content/uploads/2024/10/Kagaku-x-Bouken-Survival-Sub-Indo.jpg", true),
-                AnimeSchedule("Youkai Gakkou no Sensei Hajimemashita!", "youkai-gakkou-no-sensei-sub-indo", "Episode 11", "22:30", "14.6K", "7.18", "https://otakudesu.blog/wp-content/uploads/2024/10/Youkai-Gakkou-no-Sensei-Hajimemashita-Sub-Indo.jpg", false),
-                AnimeSchedule("Sayounara Ryuusei, Konnichiwa Jinsei", "sayounara-ryuusei-sub-indo", "Episode 11", "21:00", "22.1K", "6.95", "https://otakudesu.blog/wp-content/uploads/2024/10/Sayounara-Ryuusei-Konnichiwa-Jinsei-Sub-Indo.jpg", false),
-                AnimeSchedule("Kabushikigaisha Magi-Lumiere", "kabushikigaisha-magilumiere-sub-indo", "Episode 11", "21:30", "16.8K", "7.42", "https://otakudesu.blog/wp-content/uploads/2024/10/Kabushikigaisha-Magi-Lumiere-Sub-Indo.jpg", false)
-            )
-        )
-        _scheduleMap.value = dummyData
     }
 }
 
@@ -352,7 +279,7 @@ fun ScheduleScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Jadwal Tayang",
+                        text = "Update Series",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = ColorTextPrimary,
@@ -381,13 +308,13 @@ fun ScheduleScreen(
                 .background(ColorBgScreen)
         ) {
             when {
-                isLoading -> LoadingView(text = "Memuat jadwal rilis...")
+                isLoading -> LoadingView(text = "Memuat update series...")
                 errorMessage != null && currentAnimeList.isEmpty() -> ErrorView(
-                    message = errorMessage ?: "Gagal memuat jadwal",
+                    message = errorMessage ?: "Gagal memuat update series",
                     onRetry = { viewModel.retry() }
                 )
                 currentAnimeList.isEmpty() -> ErrorView(
-                    message = "Belum ada jadwal untuk hari ini.",
+                    message = "Belum ada update series.",
                     onRetry = { viewModel.retry() }
                 )
                 else -> {

@@ -23,7 +23,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.api.AnimeApi
 import com.zamnimeku.app.data.model.AnimeCard
 import com.zamnimeku.app.ui.components.AnimeCardView
 import com.zamnimeku.app.ui.components.ErrorView
@@ -65,7 +65,7 @@ fun HomeScreen(
         scope.launch {
             isSearching = true
             try {
-                val results = OtakuApi.searchAnime(query.trim())
+                val results = AnimeApi.searchAnime(query.trim())
                 searchResults = results
             } catch (_: Exception) {}
             finally {
@@ -85,7 +85,7 @@ fun HomeScreen(
             try {
                 if (selectedTab == 0) {
                     val p = if (initial) 1 else ongoingPage + 1
-                    val items = OtakuApi.getOngoingAnime(p)
+                    val items = AnimeApi.getOngoingAnime(p)
                     if (initial) {
                         ongoingList = items
                         ongoingPage = 1
@@ -96,7 +96,7 @@ fun HomeScreen(
                     }
                 } else {
                     val p = if (initial) 1 else completePage + 1
-                    val items = OtakuApi.getCompleteAnime(p)
+                    val items = AnimeApi.getCompleteAnime(p)
                     if (initial) {
                         completeList = items
                         completePage = 1

@@ -29,18 +29,11 @@ class ZamnimekuApp : Application(), ImageLoaderFactory {
                     .connectTimeout(15, TimeUnit.SECONDS)
                     .readTimeout(15, TimeUnit.SECONDS)
                     .addInterceptor { chain ->
-                        val original = chain.request()
-                        val host = original.url.host.lowercase()
-                        val referer = if (host.contains("mydriveku") || host.contains("mynimeku")) {
-                            "https://www.mynimeku.com/"
-                        } else {
-                            "https://otakudesu.blog/"
-                        }
-                        val req = original.newBuilder()
+                        val request = chain.request().newBuilder()
                             .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                            .header("Referer", referer)
+                            .header("Referer", "https://www.mynimeku.com/")
                             .build()
-                        chain.proceed(req)
+                        chain.proceed(request)
                     }
                     .build()
             }

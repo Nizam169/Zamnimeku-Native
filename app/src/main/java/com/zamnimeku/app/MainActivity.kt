@@ -14,7 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.api.AnimeApi
 import com.zamnimeku.app.data.api.UpdateApi
 import com.zamnimeku.app.data.api.UpdateInfo
 import com.zamnimeku.app.data.model.Episode
@@ -232,7 +232,7 @@ fun MainApp() {
                     LaunchedEffect(screen.animeSlug) {
                         if (loadedEpisodes.isEmpty()) {
                             try {
-                                val d = OtakuApi.getAnimeDetail(screen.animeSlug)
+                                val d = AnimeApi.getAnimeDetail(screen.animeSlug)
                                 if (d != null) {
                                     loadedEpisodes = d.episodes
                                 }

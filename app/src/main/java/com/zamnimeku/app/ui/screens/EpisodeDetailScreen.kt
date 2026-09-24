@@ -27,7 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.api.AnimeApi
 import com.zamnimeku.app.data.model.AnimeDetail
 import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.components.ErrorView
@@ -57,7 +57,7 @@ fun EpisodeDetailScreen(
         isLoading = true
         errorMessage = null
         try {
-            val d = OtakuApi.getAnimeDetail(animeSlug)
+            val d = AnimeApi.getAnimeDetail(animeSlug)
             detail = d
             if (d == null) errorMessage = "Gagal memuat detail anime."
         } catch (e: Exception) {

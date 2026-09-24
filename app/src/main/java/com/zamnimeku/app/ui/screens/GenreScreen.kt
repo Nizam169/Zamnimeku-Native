@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.api.AnimeApi
 import com.zamnimeku.app.data.model.AnimeCard
 import com.zamnimeku.app.data.model.Genre
 import com.zamnimeku.app.ui.components.AnimeCardView
@@ -51,7 +51,7 @@ fun GenreScreen(
             }
             try {
                 val p = if (initial) 1 else page + 1
-                val items = OtakuApi.getAnimeByGenre(genre.slug, p)
+                val items = AnimeApi.getAnimeByGenre(genre.slug, p)
                 if (initial) {
                     animeList = items
                     page = 1
@@ -72,7 +72,7 @@ fun GenreScreen(
     LaunchedEffect(Unit) {
         isLoading = true
         try {
-            val list = OtakuApi.getGenreList()
+            val list = AnimeApi.getGenreList()
             genres = list
             if (list.isNotEmpty()) {
                 selectedGenre = list.first()

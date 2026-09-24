@@ -35,6 +35,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -43,7 +44,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
-import com.zamnimeku.app.data.api.OtakuApi
+import com.zamnimeku.app.data.api.AnimeApi
 import com.zamnimeku.app.data.model.Episode
 import com.zamnimeku.app.data.model.HistoryItem
 import com.zamnimeku.app.data.model.VideoSource
@@ -99,9 +100,8 @@ fun PlayerScreen(
     val exoPlayer = remember {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-            .setDefaultRequestProperties(mapOf("Referer" to "${OtakuApi.BASE_URL}/"))
-            .setConnectTimeoutMs(8000)
-            .setReadTimeoutMs(8000)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(15000)
             .setAllowCrossProtocolRedirects(true)
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
@@ -156,7 +156,10 @@ fun PlayerScreen(
             currentUrl = url
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
-            val mediaItem = MediaItem.fromUri(Uri.parse(url))
+            val mediaItem = MediaItem.Builder()
+                .setUri(Uri.parse(url))
+                .setMimeType(MimeTypes.APPLICATION_MP4)
+                .build()
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
 
@@ -273,7 +276,7 @@ fun PlayerScreen(
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         try {
-            val sources = OtakuApi.getVideoCandidates(currentEp.slug)
+            val sources = AnimeApi.getVideoCandidates(currentEp.slug)
             candidates = sources
             val target = selectVideoSource(sources, selectedQuality)
             if (target != null) {
