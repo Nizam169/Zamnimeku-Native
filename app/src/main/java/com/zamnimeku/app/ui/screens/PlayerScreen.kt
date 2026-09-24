@@ -104,7 +104,7 @@ fun PlayerScreen(
         val httpDataSourceBuilder = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
             .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
+            .setReadTimeoutMs(30000)
             .setAllowCrossProtocolRedirects(true)
         if (source == AnimeSource.OTAKUDESU) {
             httpDataSourceBuilder.setDefaultRequestProperties(
@@ -118,8 +118,8 @@ fun PlayerScreen(
 
         val fastLoadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 8000,
-                /* maxBufferMs = */ 25000,
+                /* minBufferMs = */ 500,
+                /* maxBufferMs = */ 10000,
                 /* bufferForPlaybackMs = */ 250,
                 /* bufferForPlaybackAfterRebufferMs = */ 500
             )
