@@ -85,7 +85,7 @@ fun PlayerScreen(
     var currentUrl by remember { mutableStateOf("") }
     var activeSource by remember { mutableStateOf<VideoSource?>(null) }
     var activeUrlIndex by remember { mutableIntStateOf(0) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isResolving by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -150,7 +150,7 @@ fun PlayerScreen(
     }
 
     fun playUrl(url: String, resumeAt: Long? = null) {
-        isLoading = true
+        isBuffering = true
         errorMessage = null
         try {
             currentUrl = url
@@ -169,11 +169,12 @@ fun PlayerScreen(
             exoPlayer.playWhenReady = true
         } catch (e: Exception) {
             errorMessage = "Gagal memuat URL: ${e.message}"
-            isLoading = false
+            isBuffering = false
         }
     }
 
     fun playSource(source: VideoSource, url: String = source.url, resumeAt: Long? = null) {
+        isResolving = false
         val urls = sourceUrls(source)
         if (urls.isEmpty()) return
         val requestedIndex = urls.indexOf(url).takeIf { it >= 0 } ?: 0
@@ -189,7 +190,6 @@ fun PlayerScreen(
             override fun onPlaybackStateChanged(state: Int) {
                 isBuffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) {
-                    isLoading = false
                     durationMs = exoPlayer.duration.coerceAtLeast(0L)
                 } else if (state == Player.STATE_ENDED) {
                     if (currentEpIndex > 0) {
@@ -204,7 +204,6 @@ fun PlayerScreen(
 
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = false
-                isLoading = false
                 val source = activeSource
                 val urls = source?.let(::sourceUrls).orEmpty()
                 val nextIndex = activeUrlIndex + 1
@@ -265,7 +264,7 @@ fun PlayerScreen(
     }
 
     suspend fun loadEpisodeVideo() {
-        isLoading = true
+        isResolving = true
         errorMessage = null
         candidates = emptyList()
         activeSource = null
@@ -279,16 +278,17 @@ fun PlayerScreen(
             val target = selectVideoSource(sources, selectedQuality)
             if (target != null) {
                 selectedQuality = target.quality
+                showControls = true
                 playSource(target)
             } else {
                 errorMessage = "Video tidak ditemukan di server."
-                isLoading = false
+                isResolving = false
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             errorMessage = "Gagal memuat video: ${e.message}"
-            isLoading = false
+            isResolving = false
         }
     }
 
@@ -412,13 +412,17 @@ fun PlayerScreen(
                         }
                 )
 
-                // Buffering Spinner / Loading
-                if (isLoading) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (isResolving) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.88f)),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 3.dp)
                             Spacer(modifier = Modifier.height(10.dp))
-                            Text("Menyiapkan video ($selectedQuality)...", color = Color.White, fontSize = 12.sp)
+                            Text("Mencari server dan resolusi video...", color = Color.White, fontSize = 12.sp)
                         }
                     }
                 }
@@ -479,7 +483,7 @@ fun PlayerScreen(
                 }
 
                 // In-Screen Video Controls Overlay
-                if (showControls && !isLocked) {
+                if (showControls && !isLocked && !isResolving && errorMessage == null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
