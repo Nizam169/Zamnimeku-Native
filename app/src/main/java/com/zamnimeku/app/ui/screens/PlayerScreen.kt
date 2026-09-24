@@ -50,8 +50,10 @@ import com.zamnimeku.app.data.model.VideoSource
 import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.components.QualitySelectionDialog
 import com.zamnimeku.app.ui.theme.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -70,6 +72,7 @@ fun PlayerScreen(
 
     var currentEpIndex by remember { mutableStateOf(initialIndex) }
     val currentEp = episodes.getOrNull(currentEpIndex) ?: Episode(title = "Episode", slug = "", url = "")
+    val currentEpisodeSlug by rememberUpdatedState(currentEp.slug)
 
     var isLandscape by remember { mutableStateOf(false) }
     var isLocked by remember { mutableStateOf(false) }
@@ -80,6 +83,8 @@ fun PlayerScreen(
     var selectedQuality by remember { mutableStateOf(prefs.preferredQuality) }
     // URL yang sedang diputar — dipakai untuk deteksi "sumber sama"
     var currentUrl by remember { mutableStateOf("") }
+    var activeSource by remember { mutableStateOf<VideoSource?>(null) }
+    var activeUrlIndex by remember { mutableIntStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -94,6 +99,7 @@ fun PlayerScreen(
     val exoPlayer = remember {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+            .setDefaultRequestProperties(mapOf("Referer" to "${OtakuApi.BASE_URL}/"))
             .setConnectTimeoutMs(8000)
             .setReadTimeoutMs(8000)
             .setAllowCrossProtocolRedirects(true)
@@ -116,6 +122,64 @@ fun PlayerScreen(
             .setSeekBackIncrementMs(10000)
             .setSeekForwardIncrementMs(10000)
             .build()
+    }
+
+    fun sourceUrls(source: VideoSource): List<String> {
+        return (listOf(source.url) + source.backupUrls)
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
+    fun qualityRank(quality: String): Int {
+        return when (quality) {
+            "360p" -> 0
+            "480p" -> 1
+            "720p" -> 2
+            "1080p" -> 3
+            else -> 4
+        }
+    }
+
+    fun selectVideoSource(sources: List<VideoSource>, preferredQuality: String): VideoSource? {
+        sources.firstOrNull { it.quality == preferredQuality }?.let { return it }
+        val preferredRank = qualityRank(preferredQuality)
+        return sources.minWithOrNull(
+            compareBy<VideoSource> { abs(qualityRank(it.quality) - preferredRank) }
+                .thenBy { qualityRank(it.quality) }
+        )
+    }
+
+    fun playUrl(url: String, resumeAt: Long? = null) {
+        isLoading = true
+        errorMessage = null
+        try {
+            currentUrl = url
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
+            val mediaItem = MediaItem.fromUri(Uri.parse(url))
+            exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.prepare()
+
+            val resumePos = resumeAt?.takeIf { it > 2000L }
+                ?: prefs.getEpisodePosition(currentEpisodeSlug).takeIf { it > 2000L }
+            if (resumePos != null) {
+                exoPlayer.seekTo(resumePos)
+            }
+
+            exoPlayer.playWhenReady = true
+        } catch (e: Exception) {
+            errorMessage = "Gagal memuat URL: ${e.message}"
+            isLoading = false
+        }
+    }
+
+    fun playSource(source: VideoSource, url: String = source.url, resumeAt: Long? = null) {
+        val urls = sourceUrls(source)
+        if (urls.isEmpty()) return
+        val requestedIndex = urls.indexOf(url).takeIf { it >= 0 } ?: 0
+        activeSource = source
+        activeUrlIndex = requestedIndex
+        playUrl(urls[requestedIndex], resumeAt)
     }
 
     DisposableEffect(Unit) {
@@ -141,7 +205,14 @@ fun PlayerScreen(
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = false
                 isLoading = false
-                errorMessage = "Gagal memutar video. Silakan ganti resolusi atau coba lagi."
+                val source = activeSource
+                val urls = source?.let(::sourceUrls).orEmpty()
+                val nextIndex = activeUrlIndex + 1
+                if (source != null && nextIndex in urls.indices) {
+                    playSource(source, urls[nextIndex], exoPlayer.currentPosition)
+                } else {
+                    errorMessage = "Gagal memutar video. Silakan ganti resolusi atau coba lagi."
+                }
             }
         }
         exoPlayer.addListener(listener)
@@ -160,7 +231,7 @@ fun PlayerScreen(
     }
 
     // Save Progress Periodic & Update Episode Timeline
-    LaunchedEffect(isPlaying, currentPositionMs) {
+    LaunchedEffect(isPlaying, currentPositionMs, currentEpIndex) {
         while (isPlaying) {
             currentPositionMs = exoPlayer.currentPosition
             durationMs = exoPlayer.duration.coerceAtLeast(0L)
@@ -193,52 +264,31 @@ fun PlayerScreen(
         }
     }
 
-    fun playUrl(url: String, resumeAt: Long? = null) {
+    suspend fun loadEpisodeVideo() {
         isLoading = true
         errorMessage = null
+        candidates = emptyList()
+        activeSource = null
+        activeUrlIndex = 0
+        currentUrl = ""
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
         try {
-            currentUrl = url
-            // Hentikan stream lama dulu supaya ganti sumber bersih
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
-            val mediaItem = MediaItem.fromUri(Uri.parse(url))
-            exoPlayer.setMediaItem(mediaItem)
-            exoPlayer.prepare()
-
-            // Pertahankan posisi putar saat ganti resolusi;
-            // kalau tidak ada, pakai posisi tersimpan seperti dulu
-            val resumePos = resumeAt?.takeIf { it > 2000L }
-                ?: prefs.getEpisodePosition(currentEp.slug).takeIf { it > 2000L }
-            if (resumePos != null) {
-                exoPlayer.seekTo(resumePos)
-            }
-
-            exoPlayer.playWhenReady = true
-        } catch (e: Exception) {
-            errorMessage = "Gagal memuat URL: ${e.message}"
-            isLoading = false
-        }
-    }
-
-    fun loadEpisodeVideo() {
-        scope.launch {
-            isLoading = true
-            errorMessage = null
-            currentUrl = ""
-            try {
-                val list = OtakuApi.getVideoCandidates(currentEp.slug)
-                candidates = list
-                val target = list.firstOrNull { it.quality == selectedQuality } ?: list.firstOrNull()
-                if (target != null) {
-                    playUrl(target.url)
-                } else {
-                    errorMessage = "Video tidak ditemukan di server."
-                    isLoading = false
-                }
-            } catch (e: Exception) {
-                errorMessage = "Gagal memuat video: ${e.message}"
+            val sources = OtakuApi.getVideoCandidates(currentEp.slug)
+            candidates = sources
+            val target = selectVideoSource(sources, selectedQuality)
+            if (target != null) {
+                selectedQuality = target.quality
+                playSource(target)
+            } else {
+                errorMessage = "Video tidak ditemukan di server."
                 isLoading = false
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorMessage = "Gagal memuat video: ${e.message}"
+            isLoading = false
         }
     }
 
@@ -296,14 +346,14 @@ fun PlayerScreen(
             onQualitySelected = { q ->
                 selectedQuality = q
                 prefs.preferredQuality = q
-                val cand = candidates.firstOrNull { it.quality == q } ?: candidates.firstOrNull()
+                val cand = candidates.firstOrNull { it.quality == q }
                 if (cand != null) {
                     if (cand.url == currentUrl && currentUrl.isNotEmpty()) {
                         // Sumbernya sama persis dengan yang diputar — tidak perlu reload
                     } else {
                         // Lanjutkan dari detik yang sedang ditonton
                         val keepPos = exoPlayer.currentPosition.coerceAtLeast(0L)
-                        playUrl(cand.url, resumeAt = keepPos)
+                        playSource(cand, resumeAt = keepPos)
                     }
                 }
             },
@@ -387,7 +437,7 @@ fun PlayerScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
-                                    onClick = { loadEpisodeVideo() },
+                                    onClick = { scope.launch { loadEpisodeVideo() } },
                                     colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary)
                                 ) {
                                     Text("Coba Lagi", fontSize = 12.sp)

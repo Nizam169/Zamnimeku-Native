@@ -344,18 +344,20 @@ fun QualitySelectionDialog(
     currentQuality: String,
     onQualitySelected: (String) -> Unit,
     onDismiss: () -> Unit,
-    // Peta resolusi -> URL aktual dari server. Kalau kosong (belum dimuat),
-    // semua opsi tetap bisa diklik seperti dulu supaya tidak merusak alur lama.
     qualityUrls: Map<String, String> = emptyMap(),
     // URL yang sedang diputar — opsi dengan sumber identik ditandai
     currentUrl: String = ""
 ) {
-    val qualities = listOf(
+    val standardQualities = listOf(
         Pair("360p", "Hemat Kuota • Paling Cepat"),
         Pair("480p", "Kualitas Standar (SD) • Lancar"),
         Pair("720p", "High Definition (HD) • Jernih"),
         Pair("1080p", "Ultra Full HD (FHD) • Sangat Jernih")
     )
+    val qualities = (standardQualities + qualityUrls.keys
+        .filterNot { quality -> standardQualities.any { it.first == quality } }
+        .map { quality -> quality to "Kualitas asli dari server" })
+        .distinctBy { it.first }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -370,12 +372,10 @@ fun QualitySelectionDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Kalau server cuma punya 1 sumber untuk semua resolusi,
-                // kasih tahu user supaya tidak dikira rusak.
-                val distinctUrls = qualityUrls.values.toSet()
-                if (qualityUrls.isNotEmpty() && distinctUrls.size <= 1) {
+                val infoText = if (qualityUrls.isEmpty()) "Resolusi belum dimuat." else null
+                if (infoText != null) {
                     Text(
-                        text = "Server hanya menyediakan 1 sumber untuk episode ini.",
+                        text = infoText,
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = 11.sp,
                         modifier = Modifier.padding(bottom = 6.dp)
@@ -384,7 +384,7 @@ fun QualitySelectionDialog(
                 qualities.forEach { (q, desc) ->
                     val isSelected = q == currentQuality
                     val itemUrl = qualityUrls[q]
-                    val hasUrl = qualityUrls.isEmpty() || itemUrl != null
+                    val hasUrl = itemUrl != null
                     // Sumber identik dengan yang sedang diputar
                     val sameSource = itemUrl != null && currentUrl.isNotEmpty() && itemUrl == currentUrl
                     val descText = when {

@@ -4,16 +4,41 @@ import android.util.Base64
 import com.zamnimeku.app.data.model.*
 import kotlinx.coroutines.*
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 object OtakuApi {
     const val BASE_URL = "https://otakudesu.blog"
     private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+    private const val AUTO_QUALITY = "Auto"
+    private val QUALITY_ORDER = listOf("360p", "480p", "720p", "1080p")
+    private val UNICODE_ESCAPE = Regex("""\\u([0-9a-fA-F]{4})""")
+    private val QUOTED_MEDIA_URL = Regex("""["']([^"']+?\.(?:m3u8|mp4)(?:[?#][^"']*)?)["']""", RegexOption.IGNORE_CASE)
+    private val MEDIA_EXTENSION = Regex("""\.(?:m3u8|mp4)(?:[?#]|$)""", RegexOption.IGNORE_CASE)
+    private val URL_QUALITY = Regex("""(?:^|[^0-9])(360|480|720|1080)(?:p)?(?=$|[^0-9])""", RegexOption.IGNORE_CASE)
+
+    private data class MirrorRequest(
+        val quality: String,
+        val server: String,
+        val dataContent: String
+    )
+
+    private data class ResolvedMirror(
+        val quality: String,
+        val server: String,
+        val url: String
+    )
+
+    private data class StreamCandidate(
+        val server: String,
+        val url: String
+    )
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -339,229 +364,245 @@ object OtakuApi {
         return s.replace("\\", "\\\\").replace("$", "\\$")
     }
 
-    private fun extractVideoFromEmbed(embedUrl: String): String? {
-        if (embedUrl.isEmpty() || embedUrl.contains("mega.nz")) return null
-        try {
-            val request = Request.Builder().url(embedUrl).build()
-            val html = client.newCall(request).execute().use { it.body?.string() ?: "" }
-            if (html.isEmpty()) return null
-
-            // 1. Tag source (ondesuhd, ondesu, otakuwatch)
-            val sourceMatch = Pattern.compile("""<source[^>]+src=["']([^"']+)["']""").matcher(html)
-            if (sourceMatch.find()) {
-                val u = sourceMatch.group(1)!!
-                if (!u.contains("googlevideo.com") || !u.contains("&ip=")) {
-                    return u
-                }
-            }
-
-            // 2. videoURL (odcdn, desustream)
-            val vm = Pattern.compile("""videoURL\s*=\s*["']([^"']+)["']""").matcher(html)
-            if (vm.find()) {
-                return vm.group(1)
-            }
-
-            // 3. var vs = { file: "..." } (arcg / playerjs)
-            val fm = Pattern.compile("""file\s*:\s*["']([^"']+)["']""").matcher(html)
-            if (fm.find()) {
-                val u = fm.group(1)!!
-                if (u.startsWith("http")) return u
-            }
-
-            // 4. vidhide / filemoon (unpacked packer)
-            if (html.contains("eval(function(p,a,c,k,e,d)")) {
-                val code = unpackPacker(html)
-                val m3u8Match = Pattern.compile("""["'](https?://[^"'\s]+\.m3u8[^"'\s]*)["']""").matcher(code)
-                if (m3u8Match.find()) {
-                    val m3u8 = m3u8Match.group(1)!!
-                    if (!m3u8.startsWith("/dl?")) return m3u8
-                }
-                val mp4Match = Pattern.compile("""["'](https?://[^"'\s]+\.mp4[^"'\s]*)["']""").matcher(code)
-                if (mp4Match.find()) {
-                    val mp4 = mp4Match.group(1)!!
-                    if (!mp4.startsWith("/dl?")) return mp4
-                }
-            }
-
-            // 5. Generic direct mp4 / m3u8
-            val p1 = Pattern.compile("""["'](https?://[^"'\s]+\.mp4[^"'\s]*)["']""").matcher(html)
-            if (p1.find()) {
-                val u = p1.group(1)!!
-                if (!u.startsWith("/dl?") && (!u.contains("googlevideo.com") || !u.contains("&ip="))) {
-                    return u
-                }
-            }
-            val p2 = Pattern.compile("""["'](https?://[^"'\s]+\.m3u8[^"'\s]*)["']""").matcher(html)
-            if (p2.find()) {
-                val u = p2.group(1)!!
-                if (!u.startsWith("/dl?") && (!u.contains("googlevideo.com") || !u.contains("&ip="))) {
-                    return u
-                }
-            }
-        } catch (_: Exception) {}
-        return null
+    private fun decodeUrlText(value: String): String {
+        val slashDecoded = value.replace("\\/", "/")
+        val unicodeDecoded = UNICODE_ESCAPE.replace(slashDecoded) { match ->
+            match.groupValues[1].toInt(16).toChar().toString()
+        }
+        return Parser.unescapeEntities(unicodeDecoded, true)
     }
 
-    private fun scoreStreamUrl(u: String): Int {
-        val lu = u.lowercase()
-        if (lu.contains("odcloud.net") || lu.contains("desustream.net") || lu.contains("desustream.me")) return 100
-        if (lu.contains("archive.org")) return 95
-        if (lu.contains(".mp4")) return 80
-        if (lu.contains(".m3u8")) return 70
-        if (lu.contains("dramiyos-cdn") || lu.contains("vidhide")) return 60
+    private fun resolveHttpUrl(rawUrl: String, baseUrl: String): String? {
+        var value = decodeUrlText(rawUrl.trim())
+        if (value.length >= 2 && ((value.first() == '"' && value.last() == '"') ||
+                    (value.first() == '\'' && value.last() == '\''))
+        ) {
+            value = value.substring(1, value.length - 1)
+        }
+        val base = baseUrl.toHttpUrlOrNull()
+        val resolved = when {
+            value.startsWith("//") -> base?.let { "${it.scheme}:$value" }
+            base != null -> base.resolve(value)?.toString()
+            else -> value
+        } ?: return null
+        val url = resolved.toHttpUrlOrNull() ?: return null
+        return url.toString().takeIf { it.scheme == "http" || it.scheme == "https" }
+    }
+
+    private fun declaredQuality(rawQuality: String): String? {
+        val value = rawQuality.lowercase()
+        return when {
+            value.contains("1080") -> "1080p"
+            value.contains("720") -> "720p"
+            value.contains("480") -> "480p"
+            value.contains("360") -> "360p"
+            else -> null
+        }
+    }
+
+    private fun qualityFromUrl(url: String): String? {
+        val match = URL_QUALITY.find(decodeUrlText(url)) ?: return null
+        return "${match.groupValues[1]}p"
+    }
+
+    private fun extractKeyedUrl(text: String, baseUrl: String): String? {
+        val mediaKeyMatch = Regex(
+            """["']?\b(?:videoURL|file|hls)\b["']?\s*[:=]\s*["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE
+        ).find(text)
+        if (mediaKeyMatch != null) {
+            resolveHttpUrl(mediaKeyMatch.groupValues[1], baseUrl)?.let { return it }
+        }
+        val sourceMatch = Regex(
+            """["']?\bsrc\b["']?\s*[:=]\s*["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE
+        ).find(text) ?: return null
+        return resolveHttpUrl(sourceMatch.groupValues[1], baseUrl)
+            ?.takeIf { MEDIA_EXTENSION.containsMatchIn(it) }
+    }
+
+    private fun extractQuotedMediaUrl(text: String, baseUrl: String): String? {
+        val match = QUOTED_MEDIA_URL.find(text) ?: return null
+        return resolveHttpUrl(match.groupValues[1], baseUrl)
+    }
+
+    private fun extractVideoFromEmbed(embedUrl: String): String? {
+        if (embedUrl.isEmpty() || embedUrl.contains("mega.nz")) return null
+        return try {
+            val request = Request.Builder().url(embedUrl).build()
+            val html = client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                response.body?.string() ?: ""
+            }
+            if (html.isEmpty()) return null
+
+            val decodedHtml = decodeUrlText(html)
+            val document = Jsoup.parse(decodedHtml)
+            for (element in document.select("source[src], video[src]")) {
+                resolveHttpUrl(element.attr("src"), embedUrl)
+                    ?.takeIf { MEDIA_EXTENSION.containsMatchIn(it) }
+                    ?.let { return it }
+            }
+            extractKeyedUrl(decodedHtml, embedUrl)?.let { return it }
+
+            val unpacked = unpackPacker(decodedHtml)
+            extractKeyedUrl(unpacked, embedUrl)?.let { return it }
+            extractQuotedMediaUrl(unpacked, embedUrl)?.let { return it }
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun scoreStreamUrl(url: String): Int {
+        val lowerUrl = url.lowercase()
+        if (lowerUrl.contains("odcloud.net") || lowerUrl.contains("desustream.net") || lowerUrl.contains("desustream.me")) return 100
+        if (lowerUrl.contains("archive.org")) return 95
+        if (lowerUrl.contains(".mp4")) return 80
+        if (lowerUrl.contains(".m3u8")) return 70
+        if (lowerUrl.contains("dramiyos-cdn") || lowerUrl.contains("vidhide")) return 60
         return 10
     }
 
-    suspend fun getVideoCandidates(episodeSlug: String): List<VideoSource> = withContext(Dispatchers.IO) {
-        val qualityMap = mutableMapOf<String, MutableList<String>>(
-            "360p" to mutableListOf(),
-            "480p" to mutableListOf(),
-            "720p" to mutableListOf(),
-            "1080p" to mutableListOf()
-        )
+    private fun resolveMirror(ajaxUrl: String, nonce: String, mirror: MirrorRequest): ResolvedMirror? {
+        return try {
+            var normalizedData = mirror.dataContent.trim()
+            while (normalizedData.length % 4 != 0) normalizedData += "="
+            val metadata = JSONObject(String(Base64.decode(normalizedData, Base64.DEFAULT), Charsets.UTF_8))
 
-        fun addUrl(rawQ: String, url: String) {
-            if (url.isEmpty()) return
-            if (url.contains("googlevideo.com") && url.contains("&ip=")) return
-            val q = rawQ.lowercase().trim()
-            val targetQ = if (q.contains("1080")) {
-                "1080p"
-            } else if (q.contains("720")) {
-                "720p"
-            } else if (q.contains("480")) {
-                "480p"
-            } else {
-                "360p"
+            val postRequest = Request.Builder()
+                .url(ajaxUrl)
+                .post(
+                    FormBody.Builder()
+                        .add("id", metadata.optString("id"))
+                        .add("i", metadata.optString("i"))
+                        .add("q", metadata.optString("q"))
+                        .add("nonce", nonce)
+                        .add("action", "2a3505c93b0035d3f455df82bf976b84")
+                        .build()
+                )
+                .header("X-Requested-With", "XMLHttpRequest")
+                .build()
+
+            val responseJson = client.newCall(postRequest).execute().use { response ->
+                if (!response.isSuccessful) return null
+                response.body?.string() ?: ""
             }
-            if (!qualityMap[targetQ]!!.contains(url)) {
-                qualityMap[targetQ]!!.add(url)
+            val base64Data = JSONObject(responseJson).optString("data")
+            if (base64Data.isEmpty()) return null
+
+            var normalizedResponse = base64Data.trim()
+            while (normalizedResponse.length % 4 != 0) normalizedResponse += "="
+            val iframeHtml = decodeUrlText(
+                String(Base64.decode(normalizedResponse, Base64.DEFAULT), Charsets.UTF_8)
+            )
+            val iframeDocument = Jsoup.parse(iframeHtml)
+            val iframeSource = iframeDocument.selectFirst("iframe[src], source[src]")?.attr("src")
+                ?: Regex("""\bsrc\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                    .find(iframeHtml)?.groupValues?.get(1)
+                ?: return null
+            val embedUrl = resolveHttpUrl(iframeSource, "$BASE_URL/") ?: return null
+            val videoUrl = extractVideoFromEmbed(embedUrl) ?: return null
+            val quality = declaredQuality(metadata.optString("q"))
+                ?: declaredQuality(mirror.quality)
+                ?: ""
+
+            ResolvedMirror(
+                quality = quality,
+                server = mirror.server,
+                url = videoUrl
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun getVideoCandidates(episodeSlug: String): List<VideoSource> = withContext(Dispatchers.IO) {
+        val qualityMap = linkedMapOf<String, MutableList<StreamCandidate>>()
+
+        fun addStream(declaredQuality: String, serverName: String, rawUrl: String) {
+            val url = resolveHttpUrl(rawUrl, "$BASE_URL/") ?: return
+            if (url.contains("googlevideo.com") && url.contains("&ip=")) return
+            val quality = qualityFromUrl(url)
+                ?: declaredQuality(declaredQuality)
+                ?: AUTO_QUALITY
+            val host = url.toHttpUrlOrNull()?.host ?: "Server"
+            val server = serverName.trim().ifEmpty { host }
+            val candidates = qualityMap.getOrPut(quality) { mutableListOf() }
+            if (candidates.none { it.url == url }) {
+                candidates.add(StreamCandidate(server = server, url = url))
             }
         }
 
         try {
-            val epHtml = getHtml("$BASE_URL/episode/$episodeSlug/")
-            if (epHtml.isNotEmpty()) {
-                val doc = Jsoup.parse(epHtml)
-
-                // 1. Ambil Default Direct Stream (Sangat Cepat < 0.5 detik)
-                val defaultIframe = doc.selectFirst("iframe")?.attr("src") ?: ""
-                if (defaultIframe.isNotEmpty()) {
-                    val directV = extractVideoFromEmbed(defaultIframe)
-                    if (!directV.isNullOrEmpty()) {
-                        addUrl("1080p", directV)
-                        addUrl("720p", directV)
-                        addUrl("480p", directV)
-                        addUrl("360p", directV)
+            val episodeHtml = getHtml("$BASE_URL/episode/$episodeSlug/")
+            if (episodeHtml.isNotEmpty()) {
+                val document = Jsoup.parse(episodeHtml)
+                val defaultIframe = document.selectFirst("iframe")?.attr("src").orEmpty()
+                val defaultIframeUrl = resolveHttpUrl(defaultIframe, "$BASE_URL/")
+                if (defaultIframeUrl != null) {
+                    extractVideoFromEmbed(defaultIframeUrl)?.let { videoUrl ->
+                        addStream("", defaultIframeUrl.toHttpUrlOrNull()?.host.orEmpty(), videoUrl)
                     }
                 }
 
-                // 2. Parse mirror links
-                val mirrorElements = doc.select("ul[class^=m] li a")
-                val mirrors = mutableListOf<Triple<String, String, String>>()
-                for (a in mirrorElements) {
-                    val qClass = a.parent()?.parent()?.attr("class") ?: ""
-                    val quality = qClass.replace("m", "")
-                    val server = a.text().trim()
-                    val data = a.attr("data-content")
-                    if (data.isNotEmpty()) {
-                        mirrors.add(Triple(quality, server, data))
-                    }
+                val mirrors = document.select("ul[class] li a[data-content]").mapNotNull { anchor ->
+                    val qualityClass = anchor.closest("ul[class]")?.classNames()
+                        ?.firstOrNull { declaredQuality(it) != null }
+                        ?: return@mapNotNull null
+                    MirrorRequest(
+                        quality = qualityClass,
+                        server = anchor.text().trim(),
+                        dataContent = anchor.attr("data-content")
+                    )
                 }
 
-                // 3. Resolve mirrors via Ajax dengan batas waktu maksimal 4 detik
                 val ajaxUrl = "$BASE_URL/wp-admin/admin-ajax.php"
-                val nonceReq = Request.Builder()
+                val nonceRequest = Request.Builder()
                     .url(ajaxUrl)
                     .post(FormBody.Builder().add("action", "aa1208d27f29ca340c92c66d1926f13f").build())
                     .header("X-Requested-With", "XMLHttpRequest")
                     .build()
-
-                try {
-                    val nonceJson = client.newCall(nonceReq).execute().use { it.body?.string() ?: "" }
-                    val nonce = try { JSONObject(nonceJson).optString("data") } catch (_: Exception) { "" }
-
-                    if (nonce.isNotEmpty()) {
-                        withTimeoutOrNull(4000) {
-                            coroutineScope {
-                                mirrors.map { (quality, _, dataContent) ->
-                                    async(Dispatchers.IO) {
-                                        try {
-                                            var norm = dataContent.trim()
-                                            while (norm.length % 4 != 0) norm += "="
-                                            val decoded = String(Base64.decode(norm, Base64.DEFAULT))
-                                            val meta = JSONObject(decoded)
-
-                                            val postReq = Request.Builder()
-                                                .url(ajaxUrl)
-                                                .post(
-                                                    FormBody.Builder()
-                                                        .add("id", meta.optString("id"))
-                                                        .add("i", meta.optString("i"))
-                                                        .add("q", meta.optString("q"))
-                                                        .add("nonce", nonce)
-                                                        .add("action", "2a3505c93b0035d3f455df82bf976b84")
-                                                        .build()
-                                                )
-                                                .header("X-Requested-With", "XMLHttpRequest")
-                                                .build()
-
-                                            val rJson = client.newCall(postReq).execute().use { it.body?.string() ?: "" }
-                                            val b64Data = JSONObject(rJson).optString("data")
-                                            if (b64Data.isNotEmpty()) {
-                                                var b64Norm = b64Data.trim()
-                                                while (b64Norm.length % 4 != 0) b64Norm += "="
-                                                val iframeHtml = String(Base64.decode(b64Norm, Base64.DEFAULT))
-                                                val iframeSrc = Pattern.compile("""src=["']([^"']+)["']""").matcher(iframeHtml)
-                                                if (iframeSrc.find()) {
-                                                    val embedUrl = iframeSrc.group(1)!!
-                                                    val v = extractVideoFromEmbed(embedUrl)
-                                                    if (!v.isNullOrEmpty()) {
-                                                        addUrl(quality, v)
-                                                    }
-                                                }
-                                            }
-                                        } catch (_: Exception) {}
-                                    }
-                                }.awaitAll()
-                            }
+                val nonce = client.newCall(nonceRequest).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        ""
+                    } else {
+                        val responseJson = response.body?.string().orEmpty()
+                        try {
+                            JSONObject(responseJson).optString("data")
+                        } catch (_: Exception) {
+                            ""
                         }
                     }
-                } catch (_: Exception) {}
+                }
+
+                if (nonce.isNotEmpty() && mirrors.isNotEmpty()) {
+                    val resolvedMirrors = mirrors.map { mirror ->
+                        async(Dispatchers.IO) {
+                            withTimeoutOrNull(9000) {
+                                resolveMirror(ajaxUrl, nonce, mirror)
+                            }
+                        }
+                    }.awaitAll().filterNotNull()
+
+                    resolvedMirrors.forEach { mirror ->
+                        addStream(mirror.quality, mirror.server, mirror.url)
+                    }
+                }
             }
         } catch (_: Exception) {}
 
-        val allAvailable = mutableListOf<String>()
-        qualityMap.values.forEach { list ->
-            list.forEach { if (!allAvailable.contains(it)) allAvailable.add(it) }
-        }
+        val availableQualities = QUALITY_ORDER.filter { qualityMap.containsKey(it) }.toMutableList()
+        if (qualityMap.containsKey(AUTO_QUALITY)) availableQualities.add(AUTO_QUALITY)
 
-        // Sort by quality score
-        qualityMap.keys.forEach { k ->
-            qualityMap[k]!!.sortByDescending { scoreStreamUrl(it) }
+        return@withContext availableQualities.map { quality ->
+            val sortedCandidates = qualityMap.getValue(quality).sortedByDescending { scoreStreamUrl(it.url) }
+            VideoSource(
+                quality = quality,
+                server = sortedCandidates.first().server,
+                url = sortedCandidates.first().url,
+                backupUrls = sortedCandidates.drop(1).map { it.url }
+            )
         }
-        allAvailable.sortByDescending { scoreStreamUrl(it) }
-
-        val result = mutableListOf<VideoSource>()
-        // 4 Resolusi lengkap: 360p, 480p, 720p, dan 1080p
-        val standardQualities = listOf("360p", "480p", "720p", "1080p")
-
-        for (q in standardQualities) {
-            val list = qualityMap[q] ?: emptyList()
-            if (list.isNotEmpty()) {
-                val mainUrl = list.first()
-                val backups = list.drop(1) + allAvailable.filter { it != mainUrl }
-                result.add(VideoSource(quality = q, server = q, url = mainUrl, backupUrls = backups))
-            } else if (allAvailable.isNotEmpty()) {
-                var mainUrl = allAvailable.first()
-                if (q == "1080p") {
-                    mainUrl = qualityMap["720p"]?.firstOrNull() ?: allAvailable.first()
-                } else if (q == "360p") {
-                    mainUrl = qualityMap["480p"]?.firstOrNull() ?: allAvailable.first()
-                }
-                val backups = allAvailable.filter { it != mainUrl }
-                result.add(VideoSource(quality = q, server = q, url = mainUrl, backupUrls = backups))
-            }
-        }
-        result
     }
 }
