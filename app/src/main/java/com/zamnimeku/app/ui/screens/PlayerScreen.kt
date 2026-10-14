@@ -728,7 +728,7 @@ fun PlayerScreen(
             if (!isLandscape) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color.White,
+                    color = WibukuSurface,
                     shadowElevation = 1.dp
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -736,6 +736,7 @@ fun PlayerScreen(
                             text = animeTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
+                            color = WibukuText,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
