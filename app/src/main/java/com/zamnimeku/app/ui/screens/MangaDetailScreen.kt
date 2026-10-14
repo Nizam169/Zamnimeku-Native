@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
@@ -24,14 +25,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
 import com.zamnimeku.app.data.api.MangaApi
 import com.zamnimeku.app.data.model.MangaChapter
 import com.zamnimeku.app.data.model.MangaDetail
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.theme.*
+import com.zamnimeku.app.ui.components.PosterImage
+import com.zamnimeku.app.ui.components.StaggeredItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,23 +65,11 @@ fun MangaDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = detail?.title ?: mangaTitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = WibukuSurface)
-            )
+                TopAppBar(
+                    title = { Text(detail?.title ?: mangaTitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium) },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali") } },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = WibukuBg)
+                )
         },
         containerColor = WibukuBg
     ) { padding ->
@@ -103,95 +92,24 @@ fun MangaDetailScreen(
                 ) {
                     // Header Card
                     item {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = WibukuSurface,
-                            shadowElevation = 1.dp
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    // Cover judul: ada loading + ikon rusak supaya
-                                    // tidak kelihatan ngebug saat foto lambat/gagal
-                                    SubcomposeAsyncImage(
-                                        model = d.thumb.ifEmpty { mangaThumb },
-                                        contentDescription = d.title,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .width(110.dp)
-                                            .aspectRatio(0.72f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(WibukuBadge),
-                                        loading = {
-                                            Box(
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                CircularProgressIndicator(
-                                                    color = WibukuPrimary,
-                                                    strokeWidth = 2.5.dp,
-                                                    modifier = Modifier.size(26.dp)
-                                                )
-                                            }
-                                        },
-                                        error = {
-                                            Box(
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    Icons.Rounded.BrokenImage,
-                                                    contentDescription = null,
-                                                    tint = WibukuMuted,
-                                                    modifier = Modifier.size(36.dp)
-                                                )
-                                            }
-                                        }
-                                    )
-
-                                    Spacer(modifier = Modifier.width(14.dp))
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = d.title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = WibukuText
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Surface(
-                                                color = WibukuBadge,
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = d.status,
-                                                    color = WibukuPrimary,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Surface(
-                                                color = Color(0xFFFEF3C7),
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = d.type,
-                                                    color = Color(0xFFD97706),
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(text = "Author: ${d.author}", style = MaterialTheme.typography.bodyMedium)
-                                        Text(text = "Total Chapter: ${d.chapters.size}", style = MaterialTheme.typography.bodyMedium)
-                                    }
+                        Surface(modifier = Modifier.fillMaxWidth(), color = WibukuBg) {
+                            Column {
+                                Box(Modifier.fillMaxWidth().height(250.dp)) {
+                                    PosterImage(d.thumb.ifEmpty { mangaThumb }, d.title, Modifier.fillMaxSize())
+                                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, WibukuBg))))
+                                    Text(d.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.align(Alignment.BottomStart).padding(18.dp))
                                 }
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Surface(color = WibukuBadge, shape = RoundedCornerShape(7.dp)) {
+                                            Text(d.status, color = WibukuPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                                        }
+                                        Surface(color = WibukuCard, shape = RoundedCornerShape(7.dp)) {
+                                            Text(d.type, color = WibukuAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                                        }
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("${d.author} · ${d.chapters.size} chapter", color = WibukuMuted, style = MaterialTheme.typography.bodyMedium)
 
                                 // Genres
                                 if (d.genres.isNotEmpty()) {
@@ -273,64 +191,35 @@ fun MangaDetailScreen(
                     }
 
                     // Chapters
-                    items(displayChapters) { ch ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    onChapterClick(ch.slug, ch.title)
-                                },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = WibukuSurface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Row(
+                    itemsIndexed(displayChapters, key = { _, chapter -> chapter.slug }) { index, ch ->
+                        StaggeredItem(index) {
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { onChapterClick(ch.slug, ch.title) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = WibukuSurface),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(WibukuBadge),
-                                    contentAlignment = Alignment.Center
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        Icons.Rounded.AutoStories,
-                                        contentDescription = null,
-                                        tint = WibukuPrimary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = ch.title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = WibukuText,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (ch.date.isNotEmpty()) {
-                                        Text(
-                                            text = ch.date,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontSize = 11.sp
-                                        )
+                                    Box(
+                                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(WibukuBadge),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Rounded.AutoStories, contentDescription = null, tint = WibukuPrimary, modifier = Modifier.size(20.dp))
                                     }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(ch.title, style = MaterialTheme.typography.titleSmall, color = WibukuText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        if (ch.date.isNotEmpty()) Text(ch.date, style = MaterialTheme.typography.bodyMedium, fontSize = 11.sp)
+                                    }
+                                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = WibukuMuted)
                                 }
-
-                                Icon(
-                                    Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                    tint = WibukuMuted
-                                )
                             }
                         }
                     }

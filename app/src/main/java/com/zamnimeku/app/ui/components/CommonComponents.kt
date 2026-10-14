@@ -8,10 +8,15 @@ import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,9 +29,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,21 +64,15 @@ fun AppBottomBar(
     currentTab: NavTab,
     onTabSelected: (NavTab) -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = WibukuSurface,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    Box(
+        modifier = Modifier.fillMaxWidth().background(WibukuBg.copy(alpha = .94f)).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-        ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = WibukuBg,
-                shape = RoundedCornerShape(14.dp)
+                color = WibukuSurface,
+                shape = RoundedCornerShape(24.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, WibukuBorder)
             ) {
                 Row(
                     modifier = Modifier
@@ -103,8 +104,11 @@ fun AppBottomBar(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(bgColor)
-                                .clickable { onTabSelected(tab) }
-                                .padding(vertical = 7.dp),
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { onTabSelected(tab) }
+                                .padding(vertical = 9.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(
@@ -130,7 +134,6 @@ fun AppBottomBar(
                     }
                 }
             }
-        }
     }
 }
 
@@ -147,11 +150,15 @@ fun AnimeCardView(
     val epBadge = shown(anime.episode)
     val dayBadge = shown(anime.day)
     val categoryBadge = shown(anime.category)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(if (isPressed) .96f else 1f, tween(140), label = "animeCardScale")
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .scale(cardScale)
             .clip(RoundedCornerShape(14.dp))
-            .clickable { onClick() },
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = WibukuCard),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -160,14 +167,9 @@ fun AnimeCardView(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.72f)
+                .aspectRatio(0.72f)
             ) {
-                AsyncImage(
-                    model = anime.thumb,
-                    contentDescription = anime.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                PosterImage(anime.thumb, anime.title, Modifier.fillMaxSize())
 
                 // Subtle shadow gradient
                 Box(
@@ -259,14 +261,7 @@ fun MangaCardView(
                 contentAlignment = Alignment.Center
             ) {
                 if (manga.thumb.isNotEmpty()) {
-                    AsyncImage(
-                        model = manga.thumb,
-                        contentDescription = manga.title,
-                        // Fit = seluruh foto tampil, tidak kepotong.
-                        // Latar WibukuBadge mengisi sisa ruang kalau rasio beda.
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    PosterImage(manga.thumb, manga.title, Modifier.fillMaxSize(), ContentScale.Fit)
                 } else {
                     Icon(
                         imageVector = Icons.Rounded.MenuBook,
@@ -293,12 +288,35 @@ fun MangaCardView(
 
 @Composable
 fun LoadingView(modifier: Modifier = Modifier, text: String = "Memuat data...") {
+    val transition = rememberInfiniteTransition(label = "loadingShimmer")
+    val shimmer by transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Restart),
+        label = "shimmerOffset"
+    )
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                repeat(3) { index ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth(if (index == 0) .76f else .56f)
+                            .height(if (index == 0) 18.dp else 12.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(WibukuCard, WibukuBorder, WibukuCard),
+                                    startX = shimmer * 500f,
+                                    endX = shimmer * 500f + 500f
+                                )
+                            )
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(14.dp))
             Text(text = text, style = MaterialTheme.typography.bodyMedium, color = WibukuMuted, fontWeight = FontWeight.Medium)
         }

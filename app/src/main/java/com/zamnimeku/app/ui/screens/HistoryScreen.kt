@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +28,11 @@ import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.data.model.HistoryItem
 import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.theme.*
+import com.zamnimeku.app.ui.components.PosterImage
+import com.zamnimeku.app.ui.components.ProgressTicks
+import com.zamnimeku.app.ui.components.SectionHeader
+import com.zamnimeku.app.ui.components.StatCard
+import com.zamnimeku.app.ui.components.StaggeredItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,8 +66,8 @@ fun HistoryScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Riwayat Menonton",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = "Koleksi",
+                        style = MaterialTheme.typography.headlineMedium,
                         color = WibukuText
                     )
 
@@ -111,18 +117,27 @@ fun HistoryScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(historyList) { item ->
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatCard("Ditonton", historyList.size.toString(), WibukuTeal, (historyList.size / 20f).coerceIn(.1f, 1f), Modifier.weight(1f))
+                            StatCard("Sedang Jalan", historyList.count { it.progress in 0.02f..0.98f }.toString(), WibukuPrimary, .55f, Modifier.weight(1f))
+                            StatCard("Selesai", historyList.count { it.progress >= .98f }.toString(), WibukuAccent, .3f, Modifier.weight(1f))
+                        }
+                    }
+                    item { SectionHeader("Terakhir Ditonton", "${historyList.size} judul") }
+                    items(historyList, key = { "${it.source.name}:${it.animeSlug}" }) { item ->
+                        StaggeredItem(historyList.indexOf(item)) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(18.dp))
                                 .clickable {
                                     onHistoryClick(item.animeSlug, item.animeTitle, item.animeThumb, item.lastEpIndex, item.source)
                                 },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = WibukuSurface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
@@ -132,14 +147,9 @@ fun HistoryScreen(
                                     .padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                AsyncImage(
-                                    model = item.animeThumb,
-                                    contentDescription = item.animeTitle,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(70.dp, 90.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                )
+                                Box(Modifier.size(76.dp, 98.dp).clip(RoundedCornerShape(12.dp))) {
+                                    PosterImage(item.animeThumb, item.animeTitle, Modifier.fillMaxSize())
+                                }
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -161,15 +171,7 @@ fun HistoryScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    LinearProgressIndicator(
-                                        progress = { item.progress },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(4.dp)
-                                            .clip(RoundedCornerShape(2.dp)),
-                                        color = WibukuPrimary,
-                                        trackColor = WibukuBorder
-                                    )
+                                    ProgressTicks(item.progress, Modifier.fillMaxWidth(), WibukuPrimary)
                                 }
 
                                 IconButton(onClick = {
@@ -184,6 +186,7 @@ fun HistoryScreen(
                                     )
                                 }
                             }
+                        }
                         }
                     }
                 }

@@ -771,7 +771,7 @@ fun PlayerScreen(
                                 },
                             shape = RoundedCornerShape(10.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isCurrent) WibukuBadge else Color.White
+                                containerColor = if (isCurrent) WibukuBadge else WibukuSurface
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
@@ -783,7 +783,7 @@ fun PlayerScreen(
                                     Icon(
                                         imageVector = if (isDone) Icons.Rounded.CheckCircle else if (isCurrent || hasWatched) Icons.Rounded.PlayCircleFilled else Icons.Rounded.PlayCircleOutline,
                                         contentDescription = null,
-                                        tint = if (isCurrent) WibukuPrimary else if (isDone) Color(0xFF10B981) else if (hasWatched) Color(0xFFE74C3C) else WibukuMuted,
+                                        tint = if (isCurrent) WibukuPrimary else if (isDone) WibukuTeal else if (hasWatched) WibukuPrimary else WibukuMuted,
                                         modifier = Modifier.size(24.dp)
                                     )
 
@@ -817,8 +817,8 @@ fun PlayerScreen(
                                             .fillMaxWidth()
                                             .height(3.dp)
                                             .clip(RoundedCornerShape(2.dp)),
-                                        color = if (isDone) WibukuPrimary else Color(0xFFE74C3C),
-                                        trackColor = Color(0xFFBECFDE)
+                                        color = if (isDone) WibukuTeal else WibukuPrimary,
+                                        trackColor = WibukuBorder
                                     )
                                 }
                             }

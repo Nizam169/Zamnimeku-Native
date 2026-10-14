@@ -25,7 +25,12 @@ import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.components.MangaCardView
 import com.zamnimeku.app.ui.theme.*
+import com.zamnimeku.app.ui.components.PosterImage
+import com.zamnimeku.app.ui.components.StaggeredItem
+import com.zamnimeku.app.ui.components.PosterSkeletonGrid
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 
 @Composable
 fun MangaListScreen(
@@ -39,9 +44,11 @@ fun MangaListScreen(
     var searchResults by remember { mutableStateOf<List<MangaCard>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var searchMode by remember { mutableStateOf(false) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
 
     var isLoading by remember { mutableStateOf(true) }
     var isLoadingMore by remember { mutableStateOf(false) }
+    var requestedPageAtEnd by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun doSearch(query: String) {
@@ -51,15 +58,25 @@ fun MangaListScreen(
             return
         }
         searchMode = true
-        scope.launch {
+        searchJob?.cancel()
+        searchJob = scope.launch {
             isSearching = true
             try {
                 val results = MangaApi.searchKomik(query.trim())
-                searchResults = results
-            } catch (_: Exception) {}
-            finally {
-                isSearching = false
+                if (searchQuery.trim() == query.trim()) searchResults = results
+            } catch (_: Exception) {
+                if (searchQuery.trim() == query.trim()) searchResults = emptyList()
             }
+            finally {
+                if (searchQuery.trim() == query.trim()) isSearching = false
+            }
+        }
+    }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.length >= 3) {
+            delay(350)
+            doSearch(searchQuery)
         }
     }
 
@@ -132,8 +149,8 @@ fun MangaListScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "BACA KOMIK",
-                                style = MaterialTheme.typography.titleLarge,
+                                text = "Dunia Cerita",
+                                style = MaterialTheme.typography.headlineMedium,
                                 color = WibukuText,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 1.5.sp,
@@ -161,7 +178,7 @@ fun MangaListScreen(
                                 // 52dp: tinggi minimum TextField Material3 (±56dp)
                                 // dikompensasi, teks tidak kepotong atas-bawah
                                 .height(52.dp),
-                            color = Color.White,
+                            color = WibukuCard,
                             shape = RoundedCornerShape(12.dp),
                             shadowElevation = 1.dp
                         ) {
@@ -178,10 +195,15 @@ fun MangaListScreen(
                                     onValueChange = {
                                         searchQuery = it
                                         if (it.isEmpty()) {
+                                            searchJob?.cancel()
+                                            isSearching = false
                                             searchMode = false
                                             searchResults = emptyList()
-                                        } else if (it.length >= 3) {
-                                            doSearch(it)
+                                        } else if (it.length < 3) {
+                                            searchJob?.cancel()
+                                            isSearching = false
+                                            searchMode = false
+                                            searchResults = emptyList()
                                         }
                                     },
                                     placeholder = { Text("Cari judul komik...", color = WibukuMuted, fontSize = 13.sp) },
@@ -205,6 +227,8 @@ fun MangaListScreen(
                                     IconButton(
                                         onClick = {
                                             searchQuery = ""
+                                            searchJob?.cancel()
+                                            isSearching = false
                                             searchMode = false
                                             searchResults = emptyList()
                                         },
@@ -241,10 +265,10 @@ fun MangaListScreen(
         ) {
             if (searchMode) {
                 if (isSearching) {
-                    LoadingView(text = "Mencari komik '$searchQuery'...")
+                    PosterSkeletonGrid(Modifier.fillMaxSize())
                 } else if (searchResults.isNotEmpty()) {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
+                        columns = GridCells.Fixed(2),
                         contentPadding = PaddingValues(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -270,21 +294,23 @@ fun MangaListScreen(
                     val gridState = rememberLazyGridState()
 
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
+                        columns = GridCells.Fixed(2),
                         state = gridState,
                         contentPadding = PaddingValues(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(mangaList) { manga ->
-                            MangaCardView(manga = manga) {
-                                onMangaClick(manga.slug, manga.title, manga.thumb)
+                        items(mangaList, key = { it.slug }) { manga ->
+                            StaggeredItem(mangaList.indexOf(manga)) {
+                                MangaCardView(manga = manga) {
+                                    onMangaClick(manga.slug, manga.title, manga.thumb)
+                                }
                             }
                         }
 
                         if (isLoadingMore) {
-                            item(span = { GridItemSpan(3) }) {
+                            item(span = { GridItemSpan(2) }) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -306,8 +332,10 @@ fun MangaListScreen(
                         }
                     }
 
-                    LaunchedEffect(shouldLoadMore.value) {
-                        if (shouldLoadMore.value && !isLoadingMore && !isLoading) {
+                    LaunchedEffect(shouldLoadMore.value, isLoadingMore, isLoading) {
+                        if (!shouldLoadMore.value) requestedPageAtEnd = false
+                        if (shouldLoadMore.value && !requestedPageAtEnd && !isLoadingMore && !isLoading) {
+                            requestedPageAtEnd = true
                             loadManga(initial = false)
                         }
                     }

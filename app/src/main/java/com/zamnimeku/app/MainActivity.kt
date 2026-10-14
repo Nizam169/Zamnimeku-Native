@@ -8,6 +8,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -182,7 +189,14 @@ fun MainApp() {
         ) {
             when (val screen = currentScreen) {
                 is Screen.Main -> {
-                    when (currentTab) {
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = {
+                            (slideInHorizontally { it / 10 } + fadeIn(tween(220))) togetherWith
+                                (slideOutHorizontally { -it / 12 } + fadeOut(tween(160)))
+                        },
+                        label = "mainTabTransition"
+                    ) { tab -> when (tab) {
                         NavTab.HOME -> HomeScreen(
                             onAnimeClick = { slug, title, thumb ->
                                 navigateTo(Screen.AnimeDetail(slug, title, thumb, AnimeSource.OTAKUDESU))
@@ -220,7 +234,7 @@ fun MainApp() {
                                 navigateTo(Screen.AnimeDetail(slug, title, thumb, source))
                             }
                         )
-                    }
+                    } }
                 }
 
                 is Screen.AnimeDetail -> {

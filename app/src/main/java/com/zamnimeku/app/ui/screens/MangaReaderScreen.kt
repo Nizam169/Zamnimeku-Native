@@ -87,7 +87,7 @@ fun MangaReaderScreen(
     }
 
     Scaffold(
-        containerColor = Color(0xFF1E293B)
+        containerColor = WibukuBg
     ) { padding ->
         Box(
             modifier = Modifier
@@ -115,7 +115,7 @@ fun MangaReaderScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFF0F172A)),
+                            .background(WibukuBg),
                         contentAlignment = Alignment.Center
                     ) {
                         SubcomposeAsyncImage(
@@ -166,7 +166,7 @@ fun MangaReaderScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFF0F172A))
+                                .background(WibukuBg)
                         ) {
                             SubcomposeAsyncImage(
                                 model = ImageRequest.Builder(context)

@@ -14,19 +14,21 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PlayCircleFilled
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.BookmarkAdd
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.zamnimeku.app.data.api.AnimeApi
 import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.data.model.AnimeDetail
@@ -35,6 +37,9 @@ import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.theme.*
+import com.zamnimeku.app.ui.components.PosterImage
+import com.zamnimeku.app.ui.components.ProgressTicks
+import com.zamnimeku.app.ui.components.StaggeredItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,10 +53,14 @@ fun EpisodeDetailScreen(
 ) {
     val context = LocalContext.current
     val prefs = remember { AppPreferences(context) }
+    val scope = rememberCoroutineScope()
     var detail by remember { mutableStateOf<AnimeDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var retryTrigger by remember { mutableStateOf(0) }
+    var synopsisExpanded by remember { mutableStateOf(false) }
+    var inWatchlist by remember(animeSlug, source) { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val history = remember { prefs.getHistory() }
     val lastWatched = history.firstOrNull { it.animeSlug == animeSlug && it.source == source }
@@ -75,25 +84,7 @@ fun EpisodeDetailScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = detail?.title ?: animeTitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = WibukuSurface)
-            )
-        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = WibukuBg
     ) { padding ->
         Box(
@@ -118,91 +109,72 @@ fun EpisodeDetailScreen(
                             color = WibukuSurface,
                             shadowElevation = 1.dp
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    AsyncImage(
-                                        model = d.thumb.ifEmpty { animeThumb },
-                                        contentDescription = d.title,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .width(110.dp)
-                                            .aspectRatio(0.72f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                    )
-
-                                    Spacer(modifier = Modifier.width(14.dp))
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = d.title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = WibukuText
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Rounded.Star, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(text = d.score, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = WibukuText)
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Surface(
-                                                color = WibukuBadge,
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = d.status,
-                                                    color = WibukuPrimary,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(text = "Studio: ${d.studio}", style = MaterialTheme.typography.bodyMedium)
-                                        Text(text = "Total Ep: ${d.totalEpisodes} (${d.duration})", style = MaterialTheme.typography.bodyMedium)
+                            Column {
+                                Box(Modifier.fillMaxWidth().height(280.dp)) {
+                                    PosterImage(d.thumb.ifEmpty { animeThumb }, d.title, Modifier.fillMaxSize())
+                                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, WibukuSurface))))
+                                    Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
+                                        Text("ANIME · ${d.status.uppercase()}", color = WibukuAccent, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
+                                        Text(d.title, style = MaterialTheme.typography.headlineLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 10.dp, top = 4.dp)) {
+                                        Icon(Icons.Rounded.ArrowBack, "Kembali", tint = WibukuText)
                                     }
                                 }
-
-                                // Genre chips
+                                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Icon(Icons.Rounded.Star, contentDescription = null, tint = WibukuAccent, modifier = Modifier.size(18.dp))
+                                        Text(d.score, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = WibukuText)
+                                        Text("· ${d.releaseDate}", color = WibukuMuted, fontSize = 12.sp)
+                                        Text("· ${d.totalEpisodes} episode", color = WibukuMuted, fontSize = 12.sp)
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(onClick = {
+                                            if (d.episodes.isNotEmpty()) {
+                                                val startIndex = lastWatched?.lastEpSlug?.let { slug -> d.episodes.indexOfFirst { it.slug == slug } }
+                                                    ?.takeIf { it >= 0 } ?: 0
+                                                onEpisodeClick(startIndex, d.episodes[startIndex].slug)
+                                            }
+                                        }, colors = ButtonDefaults.buttonColors(containerColor = WibukuPrimary)) {
+                                            Icon(Icons.Rounded.PlayArrow, null)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Tonton")
+                                        }
+                                        OutlinedButton(onClick = {
+                                            inWatchlist = !inWatchlist
+                                            scope.launch { snackbarHostState.showSnackbar(if (inWatchlist) "Ditambahkan ke watchlist" else "Dihapus dari watchlist") }
+                                        }, border = androidx.compose.foundation.BorderStroke(1.dp, WibukuBorder)) {
+                                            Icon(if (inWatchlist) Icons.Rounded.Check else Icons.Rounded.BookmarkAdd, null)
+                                            Spacer(Modifier.width(5.dp))
+                                            Text(if (inWatchlist) "Di Watchlist" else "Watchlist")
+                                        }
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        Text("Studio ${d.studio}", color = WibukuMuted, fontSize = 11.sp)
+                                        Text("·", color = WibukuMuted)
+                                        Text(d.type, color = WibukuMuted, fontSize = 11.sp)
+                                    }
+                                }
+                                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Sinopsis", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                        Text(if (synopsisExpanded) "Lebih sedikit" else "Baca selengkapnya", color = WibukuPrimary, fontSize = 11.sp, modifier = Modifier.clickable { synopsisExpanded = !synopsisExpanded })
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(d.synopsis, style = MaterialTheme.typography.bodyMedium, maxLines = if (synopsisExpanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis, lineHeight = 19.sp)
+                                }
                                 if (d.genres.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        items(d.genres) { g ->
-                                            Surface(
-                                                color = WibukuBg,
-                                                shape = RoundedCornerShape(16.dp)
-                                            ) {
-                                                Text(
-                                                    text = g,
-                                                    color = WibukuMuted,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                                )
+                                    LazyRow(contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        items(d.genres) { genre ->
+                                            Surface(color = WibukuCard, shape = RoundedCornerShape(16.dp)) {
+                                                Text(genre, color = WibukuMuted, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                                             }
                                         }
                                     }
                                 }
 
-                                // Synopsis
-                                if (d.synopsis.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = "Sinopsis",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = d.synopsis,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        lineHeight = 18.sp
-                                    )
-                                }
-                            }
                         }
                     }
 
@@ -215,11 +187,10 @@ fun EpisodeDetailScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Daftar Episode (${d.episodes.size})",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column {
+                                Text("LANJUTKAN CERITA", color = WibukuAccent, fontSize = 9.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.Black)
+                                Text(text = "Daftar Episode · ${d.episodes.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
 
@@ -230,7 +201,7 @@ fun EpisodeDetailScreen(
                         val isDone = epProg >= 0.9f
                         val isLastWatched = lastWatched?.lastEpSlug == ep.slug
 
-                        Card(
+                        StaggeredItem(index) { Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -252,7 +223,7 @@ fun EpisodeDetailScreen(
                                     Icon(
                                         imageVector = if (isDone) Icons.Rounded.CheckCircle else if (hasWatched) Icons.Rounded.PlayCircleFilled else Icons.Rounded.PlayCircle,
                                         contentDescription = null,
-                                        tint = if (isDone) Color(0xFF10B981) else if (hasWatched) Color(0xFFE74C3C) else WibukuMuted,
+                                        tint = if (isDone) WibukuTeal else if (hasWatched) WibukuPrimary else WibukuMuted,
                                         modifier = Modifier.size(26.dp)
                                     )
 
@@ -263,6 +234,7 @@ fun EpisodeDetailScreen(
                                             text = ep.title,
                                             style = MaterialTheme.typography.titleSmall,
                                             color = if (isLastWatched) WibukuPrimary else WibukuText,
+                                            textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None,
                                             fontWeight = if (isLastWatched || hasWatched) FontWeight.Bold else FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -280,18 +252,10 @@ fun EpisodeDetailScreen(
                                 // ── PROGRESS TIMELINE BAR ALA FLUTTER ──
                                 if (hasWatched) {
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    LinearProgressIndicator(
-                                        progress = { epProg },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(4.dp)
-                                            .clip(RoundedCornerShape(2.dp)),
-                                        color = if (isDone) WibukuPrimary else Color(0xFFE74C3C),
-                                        trackColor = Color(0xFFBECFDE)
-                                    )
+                                    ProgressTicks(epProg, Modifier.fillMaxWidth(), if (isDone) WibukuTeal else WibukuPrimary)
                                 }
                             }
-                        }
+                        } }
                     }
                 }
             }

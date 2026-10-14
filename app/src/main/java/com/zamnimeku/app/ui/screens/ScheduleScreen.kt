@@ -3,9 +3,12 @@ package com.zamnimeku.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,9 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,11 +30,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.theme.*
+import com.zamnimeku.app.ui.components.PosterImage
+import com.zamnimeku.app.ui.components.PulseDot
+import com.zamnimeku.app.ui.components.StaggeredItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -282,20 +286,19 @@ fun ScheduleScreen(
                     .statusBarsPadding()
                     .background(ColorBgScreen)
             ) {
-                // 1. HEADER (Teks Tengah, Bold, 22sp)
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 14.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
                 ) {
                     Text(
-                        text = "Jadwal Tayang",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ColorTextPrimary,
-                        textAlign = TextAlign.Center
+                        text = "MINGGUAN",
+                        fontSize = 10.sp,
+                        letterSpacing = 2.sp,
+                        fontWeight = FontWeight.Black,
+                        color = WibukuAccent
                     )
+                    Text("Jadwal Tayang", style = MaterialTheme.typography.headlineMedium, color = ColorTextPrimary)
                 }
 
                 // Divider tipis di bawah header
@@ -335,11 +338,13 @@ fun ScheduleScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 90.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(currentAnimeList, key = { it.title + it.time }) { anime ->
-                    AnimeScheduleCard(
-                        anime = anime,
-                        onClick = { onAnimeClick(anime.slug, anime.title, anime.posterUrl) }
-                    )
+                itemsIndexed(currentAnimeList, key = { _, it -> it.slug }) { index, anime ->
+                    StaggeredItem(index) {
+                        AnimeScheduleCard(
+                            anime = anime,
+                            onClick = { onAnimeClick(anime.slug, anime.title, anime.posterUrl) }
+                        )
+                    }
                 }
             }
                 }
@@ -376,11 +381,14 @@ fun DaySelector(
         days.forEachIndexed { index, day ->
             val isSelected = index == selectedIndex
 
+            val selectedScale by animateFloatAsState(if (isSelected) 1.07f else 1f, tween(200), label = "dayScale")
             Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(if (isSelected) WibukuCard else Color.Transparent)
                     .clickable { onDaySelected(index) }
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                    .padding(horizontal = 7.dp, vertical = 7.dp)
+                    .scale(selectedScale),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Singkatan Hari di Atas
@@ -397,7 +405,8 @@ fun DaySelector(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .scale(selectedScale)
+                        .clip(RoundedCornerShape(13.dp))
                         .background(if (isSelected) ColorPrimary else Color.Transparent),
                     contentAlignment = Alignment.Center
                 ) {
@@ -431,12 +440,8 @@ fun AnimeScheduleCard(
 ) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 2.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = ColorPrimary.copy(alpha = 0.15f)
-            )
+                    .fillMaxWidth()
+                    .shadow(elevation = 0.dp, shape = RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
             .clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
@@ -454,7 +459,7 @@ fun AnimeScheduleCard(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(4.dp)
-                    .background(ColorPrimary)
+                    .background(if (anime.isAired) WibukuTeal else ColorPrimary)
             )
 
             // Kolom Kiri: Jam Tayang (Lebar ±72dp, bold, 20sp, rata tengah)
@@ -483,29 +488,7 @@ fun AnimeScheduleCard(
                     .background(ColorPrimaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                if (anime.posterUrl.isNotEmpty()) {
-                    AsyncImage(
-                        model = anime.posterUrl,
-                        contentDescription = anime.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    // Placeholder selagi foto detail dimuat
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(
-                            color = ColorPrimary,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Memuat...",
-                            fontSize = 10.sp,
-                            color = ColorTextSecondary
-                        )
-                    }
-                }
+                PosterImage(anime.posterUrl, anime.title, Modifier.fillMaxSize())
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -593,14 +576,14 @@ fun AnimeScheduleCard(
                         modifier = Modifier
                             .size(7.dp)
                             .clip(CircleShape)
-                            .background(if (anime.isAired) ColorPrimary else ColorTextSecondary)
+                    .background(if (anime.isAired) WibukuTeal else ColorPrimary)
                     )
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = if (anime.isAired) "Sudah Tayang" else "Belum Tayang",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (anime.isAired) ColorPrimary else ColorTextSecondary
+                        color = if (anime.isAired) WibukuTeal else ColorPrimary
                     )
                 }
             }

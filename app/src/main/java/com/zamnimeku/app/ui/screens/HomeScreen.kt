@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,6 +35,16 @@ import com.zamnimeku.app.data.model.AnimeSource
 import com.zamnimeku.app.ui.components.AnimeCardView
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
+import com.zamnimeku.app.ui.components.ContinueWatchingCard
+import com.zamnimeku.app.ui.components.PosterImage
+import com.zamnimeku.app.ui.components.SectionHeader
+import com.zamnimeku.app.ui.components.StatCard
+import com.zamnimeku.app.ui.components.HeroCarousel
+import com.zamnimeku.app.ui.components.PosterRail
+import com.zamnimeku.app.ui.components.StaggeredItem
+import com.zamnimeku.app.ui.components.PosterSkeletonGrid
+import com.zamnimeku.app.ui.components.PulseDot
+import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.theme.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -48,6 +59,8 @@ fun HomeScreen(
     source: AnimeSource = AnimeSource.OTAKUDESU
 ) {
     val useMyNimeku = source == AnimeSource.MYNIMEKU
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val history = remember { AppPreferences(context).getHistory() }
     var selectedTab by remember { mutableStateOf(0) }
     var selectedCategory by remember { mutableStateOf("Semua") }
     var loadedSource by remember { mutableStateOf(source) }
@@ -186,7 +199,7 @@ fun HomeScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
+                            .padding(start = 18.dp, end = 16.dp, top = 18.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -208,15 +221,15 @@ fun HomeScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "ZAMNIMEKU",
-                                style = MaterialTheme.typography.titleLarge,
+                                text = "Halo, Otaku",
+                                style = MaterialTheme.typography.headlineMedium,
                                 color = WibukuText,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 1.5.sp,
                                 fontSize = 20.sp
                             )
                             Text(
-                                text = if (useMyNimeku) "MyNimeku • Anime2" else "Otakudesu • Anime Sub Indo",
+                                text = if (useMyNimeku) "Senang melihatmu kembali · Anime2" else "Siap untuk episode berikutnya?",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = WibukuMuted,
                                 fontSize = 12.sp
@@ -321,57 +334,12 @@ fun HomeScreen(
 
                     // ── TAB SELECTOR (ONGOING / COMPLETE) ──
                     if (!searchMode) {
-                        Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                color = WibukuCard,
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(4.dp)
-                            ) {
-                                val tabs = listOf("Ongoing Anime", "Complete Anime")
-                                tabs.forEachIndexed { index, title ->
-                                    val isSelected = selectedTab == index
-                                    val tabScale by animateFloatAsState(
-                                        targetValue = if (isSelected) 1.03f else 1f,
-                                        animationSpec = tween(180),
-                                        label = "homeTabScale"
-                                    )
-                                    val tabBg by animateColorAsState(
-                                        targetValue = if (isSelected) WibukuPrimary else Color.Transparent,
-                                        animationSpec = tween(durationMillis = 200),
-                                        label = "tabBg"
-                                    )
-                                    val tabColor by animateColorAsState(
-                                        targetValue = if (isSelected) Color.White else WibukuMuted,
-                                        animationSpec = tween(durationMillis = 200),
-                                        label = "tabColor"
-                                    )
-
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(tabBg)
-                                            .clickable { selectedTab = index }
-                                            .scale(tabScale)
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = title,
-                                            color = tabColor,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        com.zamnimeku.app.ui.components.SegmentedTabs(
+                            labels = listOf("Ongoing", "Complete"),
+                            selectedIndex = selectedTab,
+                            onSelected = { selectedTab = it },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
                     }
 
                     if (useMyNimeku) {
@@ -416,10 +384,10 @@ fun HomeScreen(
             }
             if (searchMode) {
                 if (isSearching) {
-                    LoadingView(text = "Mencari anime '$searchQuery'...")
+                    PosterSkeletonGrid(Modifier.fillMaxSize())
                 } else if (visibleSearchResults.isNotEmpty()) {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
+                        columns = GridCells.Fixed(2),
                         contentPadding = PaddingValues(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -456,21 +424,77 @@ fun HomeScreen(
                     val gridState = rememberLazyGridState()
 
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
+                        columns = GridCells.Fixed(2),
                         state = gridState,
-                        contentPadding = PaddingValues(10.dp),
+                        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(visibleList) { anime ->
-                            AnimeCardView(anime = anime) {
-                                onAnimeClick(anime.slug, anime.title, anime.thumb)
+                        if (selectedTab == 0 && !useMyNimeku) {
+                            item(span = { GridItemSpan(2) }) {
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        StatCard("Riwayat", history.size.toString(), WibukuTeal, (history.size / 20f).coerceIn(.12f, 1f), Modifier.weight(1f))
+                                        StatCard("Ongoing", ongoingList.size.toString(), WibukuPrimary, (ongoingList.size / 24f).coerceIn(.12f, 1f), Modifier.weight(1f))
+                                        StatCard("Selesai", completeList.size.toString(), WibukuAccent, (completeList.size / 24f).coerceIn(.12f, 1f), Modifier.weight(1f))
+                                    }
+                                    HeroCarousel(visibleList.take(5)) { onAnimeClick(it.slug, it.title, it.thumb) }
+                                    SectionHeader("Baru Rilis")
+                                    PosterRail(visibleList) { onAnimeClick(it.slug, it.title, it.thumb) }
+                                    history.firstOrNull()?.let { last ->
+                                        SectionHeader("Lanjut Nonton", "History")
+                                        ContinueWatchingCard(last.animeTitle, last.lastEpTitle, last.animeThumb, last.progress) {
+                                            onAnimeClick(last.animeSlug, last.animeTitle, last.animeThumb)
+                                        }
+                                    }
+                                    SectionHeader("Sedang Tayang", "${visibleList.size} judul")
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                                    ) {
+                                        PulseDot(WibukuPrimary)
+                                        Text("LIVE", color = WibukuPrimary, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+                                        Text("Episode baru minggu ini", color = WibukuMuted, fontSize = 10.sp)
+                                    }
+                                    if (history.isNotEmpty()) {
+                                        SectionHeader("Aktivitas Terbaru")
+                                        history.take(2).forEach { recent ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
+                                                    .clip(RoundedCornerShape(14.dp)).background(WibukuSurface)
+                                                    .clickable { onAnimeClick(recent.animeSlug, recent.animeTitle, recent.animeThumb) }
+                                                    .padding(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(Modifier.size(38.dp, 48.dp).clip(RoundedCornerShape(8.dp))) {
+                                                    PosterImage(recent.animeThumb, recent.animeTitle, Modifier.fillMaxSize())
+                                                }
+                                                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                                                    Text(recent.animeTitle, color = WibukuText, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                                    Text("${recent.lastEpTitle} · aktivitas terbaru", color = WibukuMuted, fontSize = 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                                }
+                                                ProgressTicks(recent.progress, Modifier.width(46.dp), WibukuTeal)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        itemsIndexed(visibleList, key = { _, anime -> anime.slug }) { index, anime ->
+                            StaggeredItem(index = index) {
+                                AnimeCardView(anime = anime) {
+                                    onAnimeClick(anime.slug, anime.title, anime.thumb)
+                                }
                             }
                         }
 
                         if (isLoadingMore) {
-                            item(span = { GridItemSpan(3) }) {
+                            item(span = { GridItemSpan(2) }) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()

@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +27,8 @@ import com.zamnimeku.app.ui.components.AnimeCardView
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.theme.*
+import com.zamnimeku.app.ui.components.SectionHeader
+import com.zamnimeku.app.ui.components.StaggeredItem
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,12 +112,10 @@ fun GenreScreen(
                         .fillMaxWidth()
                         .statusBarsPadding()
                 ) {
-                    Text(
-                        text = "Kategori & Genre",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = WibukuText,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)
-                    )
+                    Column(Modifier.padding(start = 18.dp, end = 16.dp, top = 18.dp, bottom = 8.dp)) {
+                        Text("JELAJAHI", color = WibukuAccent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Black)
+                        Text("Kategori & Genre", style = MaterialTheme.typography.headlineMedium, color = WibukuText)
+                    }
 
                     if (genres.isNotEmpty()) {
                         LazyRow(
@@ -164,30 +166,35 @@ fun GenreScreen(
                 )
             } else {
                 val gridState = rememberLazyGridState()
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    state = gridState,
-                    contentPadding = PaddingValues(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(animeList) { anime ->
-                        AnimeCardView(anime = anime) {
-                            onAnimeClick(anime.slug, anime.title, anime.thumb)
+                Column(Modifier.fillMaxSize()) {
+                    selectedGenre?.let { genre ->
+                        Surface(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), color = WibukuCard, shape = RoundedCornerShape(18.dp)) {
+                            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(10.dp).clip(CircleShape).background(WibukuPrimary))
+                                Spacer(Modifier.width(10.dp))
+                                Text(genre.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                Text("${animeList.size} judul", color = WibukuMuted, fontSize = 11.sp)
+                            }
                         }
                     }
-
-                    if (isLoadingMore) {
-                        item(span = { GridItemSpan(3) }) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 3.dp, modifier = Modifier.size(28.dp))
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        state = gridState,
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 28.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        itemsIndexed(animeList, key = { _, anime -> anime.slug }) { index, anime ->
+                            StaggeredItem(index) {
+                                AnimeCardView(anime = anime) { onAnimeClick(anime.slug, anime.title, anime.thumb) }
+                            }
+                        }
+                        if (isLoadingMore) {
+                            item(span = { GridItemSpan(2) }) {
+                                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = WibukuPrimary, strokeWidth = 3.dp, modifier = Modifier.size(28.dp))
+                                }
                             }
                         }
                     }
@@ -203,7 +210,7 @@ fun GenreScreen(
                     }
                 }
 
-                LaunchedEffect(shouldLoadMore.value) {
+                LaunchedEffect(shouldLoadMore.value, isLoadingMore, isLoadingAnime) {
                     val g = selectedGenre
                     if (shouldLoadMore.value && !isLoadingMore && !isLoadingAnime && g != null) {
                         loadAnimeForGenre(g, initial = false)

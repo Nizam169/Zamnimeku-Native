@@ -37,6 +37,20 @@ val AppTypography = Typography(
         lineHeight = 20.sp,
         color = WibukuText
     ),
+    headlineLarge = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 30.sp,
+        lineHeight = 36.sp,
+        color = WibukuText
+    ),
+    headlineMedium = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 25.sp,
+        lineHeight = 31.sp,
+        color = WibukuText
+    ),
     bodyLarge = TextStyle(
         fontFamily = PoppinsFontFamily,
         fontWeight = FontWeight.Normal,
