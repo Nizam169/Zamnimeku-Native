@@ -44,6 +44,7 @@ import com.zamnimeku.app.ui.components.PosterRail
 import com.zamnimeku.app.ui.components.StaggeredItem
 import com.zamnimeku.app.ui.components.PosterSkeletonGrid
 import com.zamnimeku.app.ui.components.PulseDot
+import com.zamnimeku.app.ui.components.ProgressTicks
 import com.zamnimeku.app.data.storage.AppPreferences
 import com.zamnimeku.app.ui.theme.*
 import kotlinx.coroutines.launch

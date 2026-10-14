@@ -150,6 +150,7 @@ fun MangaDetailScreen(
                             }
                         }
                     }
+                    }
 
                     // Chapter List Header
                     item {

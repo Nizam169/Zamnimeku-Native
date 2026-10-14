@@ -40,6 +40,7 @@ import com.zamnimeku.app.ui.theme.*
 import com.zamnimeku.app.ui.components.PosterImage
 import com.zamnimeku.app.ui.components.ProgressTicks
 import com.zamnimeku.app.ui.components.StaggeredItem
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -174,11 +175,11 @@ fun EpisodeDetailScreen(
                                         }
                                     }
                                 }
+                             }
+                         }
+                     }
 
-                        }
-                    }
-
-                    // Episodes Header
+                     // Episodes Header
                     item {
                         Row(
                             modifier = Modifier
@@ -201,35 +202,34 @@ fun EpisodeDetailScreen(
                         val isDone = epProg >= 0.9f
                         val isLastWatched = lastWatched?.lastEpSlug == ep.slug
 
-                        StaggeredItem(index) { Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    onEpisodeClick(index, ep.slug)
-                                },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isLastWatched) WibukuBadge else WibukuSurface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = if (isDone) Icons.Rounded.CheckCircle else if (hasWatched) Icons.Rounded.PlayCircleFilled else Icons.Rounded.PlayCircle,
-                                        contentDescription = null,
-                                        tint = if (isDone) WibukuTeal else if (hasWatched) WibukuPrimary else WibukuMuted,
-                                        modifier = Modifier.size(26.dp)
-                                    )
+                        StaggeredItem(index) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onEpisodeClick(index, ep.slug) },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isLastWatched) WibukuBadge else WibukuSurface
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isDone) Icons.Rounded.CheckCircle else if (hasWatched) Icons.Rounded.PlayCircleFilled else Icons.Rounded.PlayCircle,
+                                            contentDescription = null,
+                                            tint = if (isDone) WibukuTeal else if (hasWatched) WibukuPrimary else WibukuMuted,
+                                            modifier = Modifier.size(26.dp)
+                                        )
 
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
 
-                                    Column(modifier = Modifier.weight(1f)) {
+                                        Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = ep.title,
                                             style = MaterialTheme.typography.titleSmall,
@@ -246,16 +246,16 @@ fun EpisodeDetailScreen(
                                                 fontSize = 11.sp
                                             )
                                         }
+                                        }
+                                    }
+
+                                    if (hasWatched) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        ProgressTicks(epProg, Modifier.fillMaxWidth(), if (isDone) WibukuTeal else WibukuPrimary)
                                     }
                                 }
-
-                                // ── PROGRESS TIMELINE BAR ALA FLUTTER ──
-                                if (hasWatched) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    ProgressTicks(epProg, Modifier.fillMaxWidth(), if (isDone) WibukuTeal else WibukuPrimary)
-                                }
                             }
-                        } }
+                        }
                     }
                 }
             }
