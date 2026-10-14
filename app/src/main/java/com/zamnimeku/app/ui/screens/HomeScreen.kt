@@ -2,6 +2,7 @@ package com.zamnimeku.app.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +36,8 @@ import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
 import com.zamnimeku.app.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,9 +62,11 @@ fun HomeScreen(
     var searchResults by remember { mutableStateOf<List<AnimeCard>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var searchMode by remember { mutableStateOf(false) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
 
     var isLoading by remember { mutableStateOf(true) }
     var isLoadingMore by remember { mutableStateOf(false) }
+    var requestedPageAtEnd by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun doSearch(query: String) {
@@ -70,7 +76,8 @@ fun HomeScreen(
             return
         }
         searchMode = true
-        scope.launch {
+        searchJob?.cancel()
+        searchJob = scope.launch {
             isSearching = true
             try {
                 val results = if (useMyNimeku) {
@@ -78,10 +85,12 @@ fun HomeScreen(
                 } else {
                     OtakuApi.searchAnime(query.trim())
                 }
-                searchResults = results
-            } catch (_: Exception) {}
+                if (searchQuery.trim() == query.trim()) searchResults = results
+            } catch (_: Exception) {
+                if (searchQuery.trim() == query.trim()) searchResults = emptyList()
+            }
             finally {
-                isSearching = false
+                if (searchQuery.trim() == query.trim()) isSearching = false
             }
         }
     }
@@ -136,6 +145,8 @@ fun HomeScreen(
     }
 
     LaunchedEffect(selectedTab, source) {
+        searchJob?.cancel()
+        isSearching = false
         if (loadedSource != source) {
             ongoingList = emptyList()
             completeList = emptyList()
@@ -152,6 +163,14 @@ fun HomeScreen(
         }
     }
 
+    // Debounce typing and discard the previous query when a new one arrives.
+    LaunchedEffect(searchQuery, source) {
+        if (searchQuery.length >= 3) {
+            delay(350)
+            doSearch(searchQuery)
+        }
+    }
+
     Scaffold(
         topBar = {
             Surface(
@@ -163,7 +182,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .statusBarsPadding()
                 ) {
-                    // ── WIBUKU HEADER ──
+                    // Editorial app header.
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -226,7 +245,7 @@ fun HomeScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(52.dp),
-                            color = Color.White,
+                            color = WibukuCard,
                             shape = RoundedCornerShape(12.dp),
                             shadowElevation = 1.dp
                         ) {
@@ -243,10 +262,15 @@ fun HomeScreen(
                                     onValueChange = {
                                         searchQuery = it
                                         if (it.isEmpty()) {
+                                            searchJob?.cancel()
+                                            isSearching = false
                                             searchMode = false
                                             searchResults = emptyList()
-                                        } else if (it.length >= 3) {
-                                            doSearch(it)
+                                        } else if (it.length < 3) {
+                                            searchJob?.cancel()
+                                            isSearching = false
+                                            searchMode = false
+                                            searchResults = emptyList()
                                         }
                                     },
                                     placeholder = { Text("Cari anime...", color = WibukuMuted, fontSize = 13.sp) },
@@ -268,6 +292,8 @@ fun HomeScreen(
                                     IconButton(
                                         onClick = {
                                             searchQuery = ""
+                                            searchJob?.cancel()
+                                            isSearching = false
                                             searchMode = false
                                             searchResults = emptyList()
                                         },
@@ -296,10 +322,10 @@ fun HomeScreen(
                     // ── TAB SELECTOR (ONGOING / COMPLETE) ──
                     if (!searchMode) {
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            color = Color(0xFFE3F2FD),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                color = WibukuCard,
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Row(
@@ -310,6 +336,11 @@ fun HomeScreen(
                                 val tabs = listOf("Ongoing Anime", "Complete Anime")
                                 tabs.forEachIndexed { index, title ->
                                     val isSelected = selectedTab == index
+                                    val tabScale by animateFloatAsState(
+                                        targetValue = if (isSelected) 1.03f else 1f,
+                                        animationSpec = tween(180),
+                                        label = "homeTabScale"
+                                    )
                                     val tabBg by animateColorAsState(
                                         targetValue = if (isSelected) WibukuPrimary else Color.Transparent,
                                         animationSpec = tween(durationMillis = 200),
@@ -327,6 +358,7 @@ fun HomeScreen(
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(tabBg)
                                             .clickable { selectedTab = index }
+                                            .scale(tabScale)
                                             .padding(vertical = 8.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -353,7 +385,7 @@ fun HomeScreen(
                             listOf("Semua", "Anime", "Donghua", "Hentai").forEach { category ->
                                 Surface(
                                     modifier = Modifier.clickable { selectedCategory = category },
-                                    color = if (selectedCategory == category) WibukuPrimary else Color.White,
+                                    color = if (selectedCategory == category) WibukuPrimary else WibukuCard,
                                     shape = RoundedCornerShape(18.dp)
                                 ) {
                                     Text(
@@ -461,8 +493,10 @@ fun HomeScreen(
                         }
                     }
 
-                    LaunchedEffect(shouldLoadMore.value) {
-                        if (shouldLoadMore.value && !isLoadingMore && !isLoading) {
+                    LaunchedEffect(shouldLoadMore.value, isLoadingMore, isLoading) {
+                        if (!shouldLoadMore.value) requestedPageAtEnd = false
+                        if (shouldLoadMore.value && !requestedPageAtEnd && !isLoadingMore && !isLoading) {
+                            requestedPageAtEnd = true
                             loadData(initial = false)
                         }
                     }

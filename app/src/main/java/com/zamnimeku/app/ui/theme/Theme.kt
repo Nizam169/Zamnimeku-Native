@@ -1,27 +1,26 @@
 package com.zamnimeku.app.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val LightColorScheme = lightColorScheme(
+private val AnimeLogColorScheme = darkColorScheme(
     primary = WibukuPrimary,
-    onPrimary = WibukuSurface,
+    onPrimary = WibukuText,
     primaryContainer = WibukuBadge,
     onPrimaryContainer = WibukuPrimary,
     secondary = WibukuAccent,
-    onSecondary = WibukuSurface,
+    onSecondary = WibukuBg,
     background = WibukuBg,
     onBackground = WibukuText,
     surface = WibukuSurface,
     onSurface = WibukuText,
-    surfaceVariant = WibukuBg,
+    surfaceVariant = WibukuCard,
     outline = WibukuBorder
 )
 
@@ -34,14 +33,14 @@ fun ZamnimekuTheme(
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = WibukuBg.toArgb()
-            window.navigationBarColor = WibukuSurface.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
+            window.navigationBarColor = WibukuBg.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
         }
     }
 
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = AnimeLogColorScheme,
         typography = AppTypography,
         content = content
     )

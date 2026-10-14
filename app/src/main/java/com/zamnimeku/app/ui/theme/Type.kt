@@ -17,21 +17,21 @@ val PoppinsFontFamily = FontFamily(
 
 val AppTypography = Typography(
     titleLarge = TextStyle(
-        fontFamily = PoppinsFontFamily,
+        fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Bold,
         fontSize = 20.sp,
         lineHeight = 26.sp,
         color = WibukuText
     ),
     titleMedium = TextStyle(
-        fontFamily = PoppinsFontFamily,
+        fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 22.sp,
         color = WibukuText
     ),
     titleSmall = TextStyle(
-        fontFamily = PoppinsFontFamily,
+        fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
         lineHeight = 20.sp,

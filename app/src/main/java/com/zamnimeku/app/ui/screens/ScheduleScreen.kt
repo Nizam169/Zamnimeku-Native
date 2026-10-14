@@ -32,6 +32,7 @@ import coil.compose.AsyncImage
 import com.zamnimeku.app.data.api.OtakuApi
 import com.zamnimeku.app.ui.components.ErrorView
 import com.zamnimeku.app.ui.components.LoadingView
+import com.zamnimeku.app.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -42,15 +43,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
-// ─── PALET WARNA RESMI TEMA TERANG ──────────────────────────────────────────
-private val ColorBgScreen = Color(0xFFFFFFFF)
-private val ColorBgCard = Color(0xFFF5FAFE)
-private val ColorPrimary = Color(0xFF29B6F6)
-private val ColorPrimaryContainer = Color(0xFFE1F3FD)
-private val ColorTextPrimary = Color(0xFF1E293B)
-private val ColorTextSecondary = Color(0xFF64748B)
-private val ColorDivider = Color(0xFFE2E8F0)
-private val ColorStar = Color(0xFFFFC107)
+// Schedule colors follow the shared Anime.Log palette.
+private val ColorBgScreen = WibukuBg
+private val ColorBgCard = WibukuCard
+private val ColorPrimary = WibukuPrimary
+private val ColorPrimaryContainer = WibukuBadge
+private val ColorTextPrimary = WibukuText
+private val ColorTextSecondary = WibukuMuted
+private val ColorDivider = WibukuBorder
+private val ColorStar = WibukuAccent
 
 // ─── DATA MODELS ────────────────────────────────────────────────────────────
 data class AnimeSchedule(
@@ -630,7 +631,7 @@ fun FloatingDayNav(
                 .clip(RoundedCornerShape(24.dp))
                 .border(1.dp, ColorPrimary.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
                 .clickable { onPrevClick() },
-            color = Color.White,
+            color = WibukuSurface,
             shape = RoundedCornerShape(24.dp)
         ) {
             Text(
@@ -649,7 +650,7 @@ fun FloatingDayNav(
                 .clip(RoundedCornerShape(24.dp))
                 .border(1.dp, ColorPrimary.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
                 .clickable { onNextClick() },
-            color = Color.White,
+            color = WibukuSurface,
             shape = RoundedCornerShape(24.dp)
         ) {
             Text(

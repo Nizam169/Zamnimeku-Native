@@ -7,6 +7,7 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -56,11 +58,9 @@ fun AppBottomBar(
     onTabSelected: (NavTab) -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)),
-        color = Color.White,
-        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
+        modifier = Modifier.fillMaxWidth(),
+        color = WibukuSurface,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Box(
             modifier = Modifier
@@ -70,7 +70,7 @@ fun AppBottomBar(
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFFE3F2FD),
+                color = WibukuBg,
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Row(
@@ -92,6 +92,11 @@ fun AppBottomBar(
                             animationSpec = tween(durationMillis = 200),
                             label = "navColor"
                         )
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.12f else 1f,
+                            animationSpec = tween(180),
+                            label = "navIconScale"
+                        )
 
                         Box(
                             modifier = Modifier
@@ -110,7 +115,7 @@ fun AppBottomBar(
                                     imageVector = tab.icon,
                                     contentDescription = tab.title,
                                     tint = contentColor,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(20.dp).scale(iconScale)
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
@@ -148,8 +153,8 @@ fun AnimeCardView(
             .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = WibukuCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
             Box(
@@ -182,7 +187,7 @@ fun AnimeCardView(
                         modifier = Modifier
                             .padding(6.dp)
                             .align(Alignment.TopStart),
-                        color = WibukuPrimary.copy(alpha = 0.92f),
+                        color = WibukuPrimary,
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
@@ -242,15 +247,15 @@ fun MangaCardView(
             .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = WibukuCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.72f)
-                    .background(WibukuBadge),
+                    .background(WibukuCard),
                 contentAlignment = Alignment.Center
             ) {
                 if (manga.thumb.isNotEmpty()) {
